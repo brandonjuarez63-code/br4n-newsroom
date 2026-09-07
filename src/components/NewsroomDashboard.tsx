@@ -14,10 +14,6 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [scriptCount, setScriptCount] = useState<1 | 3 | 5>(3);
-  const [scriptBody, setScriptBody] = useState("");
-  const [scriptEngine, setScriptEngine] = useState("");
-  const [scriptBusy, setScriptBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
@@ -72,26 +68,6 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
     }
   }
 
-  async function onScript() {
-    setScriptBusy(true);
-    setScriptBody("");
-    try {
-      const res = await fetch("/api/script", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, count: scriptCount }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Script failed");
-      setScriptBody(json.body || "");
-      setScriptEngine(json.engine || "");
-    } catch (e) {
-      setScriptBody(e instanceof Error ? e.message : "Script failed");
-      setScriptEngine("error");
-    } finally {
-      setScriptBusy(false);
-    }
-  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -104,7 +80,7 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
             BR4N Newsroom
           </h1>
           <p className="mt-1 text-sm text-newsroom-muted">
-            Refresh → verify sources → generate a spoken 1–2 min script
+            Refresh → verify sources → ranked research desk
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -169,70 +145,31 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
         )}
       </section>
 
-      <section className="mb-10 grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div>
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <h2 className="text-xl font-bold text-white">Full feed</h2>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="rounded-md border border-newsroom-border bg-newsroom-panel px-2 py-1 text-sm"
-            >
-              <option value="importance">Importance</option>
-              <option value="newest">Newest</option>
-              <option value="confidence">Confidence</option>
-              <option value="reported">Reported</option>
-            </select>
-            <input
-              value={tag}
-              onChange={(e) => setTag(e.target.value)}
-              placeholder="Filter tag…"
-              className="rounded-md border border-newsroom-border bg-newsroom-panel px-2 py-1 text-sm"
-            />
-          </div>
-          <div className="grid gap-3">
-            {stories.map((s) => (
-              <StoryCard key={s.id} story={s} compact />
-            ))}
-          </div>
-        </div>
-
-        <aside className="h-fit rounded-xl border border-newsroom-border bg-newsroom-panel p-4">
-          <h2 className="text-lg font-bold text-white">Generate Script</h2>
-          <p className="mt-1 text-xs text-newsroom-muted">
-            Rule-based spoken script for Top 1 / 3 / 5. Optional OpenAI if key set.
-          </p>
-          <div className="mt-3 flex gap-2">
-            {([1, 3, 5] as const).map((n) => (
-              <button
-                key={n}
-                onClick={() => setScriptCount(n)}
-                className={`rounded-md px-3 py-1 text-sm font-semibold ${
-                  scriptCount === n
-                    ? "bg-newsroom-gold text-black"
-                    : "border border-newsroom-border text-newsroom-muted"
-                }`}
-              >
-                Top {n}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={onScript}
-            disabled={scriptBusy}
-            className="mt-4 w-full rounded-lg border border-newsroom-electric/50 bg-newsroom-electric/10 px-3 py-2 text-sm font-bold text-newsroom-electric disabled:opacity-60"
+      <section className="mb-10">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <h2 className="text-xl font-bold text-white">Full feed</h2>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="rounded-md border border-newsroom-border bg-newsroom-panel px-2 py-1 text-sm"
           >
-            {scriptBusy ? "Generating…" : "Generate spoken script"}
-          </button>
-          {scriptEngine && (
-            <p className="mt-2 text-[11px] text-newsroom-muted">Engine: {scriptEngine}</p>
-          )}
-          {scriptBody && (
-            <pre className="mt-3 max-h-[480px] overflow-auto whitespace-pre-wrap rounded-lg border border-newsroom-border bg-newsroom-bg p-3 text-xs leading-relaxed text-newsroom-muted">
-              {scriptBody}
-            </pre>
-          )}
-        </aside>
+            <option value="importance">Importance</option>
+            <option value="newest">Newest</option>
+            <option value="confidence">Confidence</option>
+            <option value="reported">Reported</option>
+          </select>
+          <input
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+            placeholder="Filter tag…"
+            className="rounded-md border border-newsroom-border bg-newsroom-panel px-2 py-1 text-sm"
+          />
+        </div>
+        <div className="grid gap-3">
+          {stories.map((s) => (
+            <StoryCard key={s.id} story={s} compact />
+          ))}
+        </div>
       </section>
     </div>
   );

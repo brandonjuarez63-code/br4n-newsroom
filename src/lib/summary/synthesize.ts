@@ -42,12 +42,7 @@ function pubsPhrase(pubs: string[]): string {
   return `${pubs.slice(0, -1).join(", ")}, and ${pubs[pubs.length - 1]}`;
 }
 
-/** Re-export scrub / sentence split for script + callers. */
-export function scrub(text: string): string {
-  return scrubText(text);
-}
-
-export function completeSentences(text: string, max = 12): string[] {
+function completeSentences(text: string, max = 12): string[] {
   return extractCompleteSentences(text, max);
 }
 

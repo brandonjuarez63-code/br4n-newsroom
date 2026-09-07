@@ -71,16 +71,6 @@ export interface RefreshRun {
   error: string | null;
 }
 
-export interface ScriptRecord {
-  id: number;
-  category: Category;
-  story_count: 1 | 3 | 5;
-  body: string;
-  sources_json: string;
-  created_at: string;
-  archive_date: string;
-}
-
 export interface StoryWithArticles extends Story {
   articles: (Article & { source_name?: string; source_reliability?: number; source_type?: SourceType })[];
   publications: string[];
@@ -92,7 +82,6 @@ export interface DbData {
   stories: Story[];
   story_articles: StoryArticle[];
   refresh_runs: RefreshRun[];
-  scripts: ScriptRecord[];
   meta: { last_updated: string | null; seeded: boolean };
   sequences: Record<string, number>;
 }

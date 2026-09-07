@@ -45,14 +45,12 @@ function emptyDb(): DbData {
     stories: [],
     story_articles: [],
     refresh_runs: [],
-    scripts: [],
     meta: { last_updated: null, seeded: false },
     sequences: {
       sources: 0,
       articles: 0,
       stories: 0,
       refresh_runs: 0,
-      scripts: 0,
     },
   };
 }

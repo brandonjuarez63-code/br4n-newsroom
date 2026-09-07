@@ -3,7 +3,6 @@ import type {
   Category,
   DbData,
   RefreshRun,
-  ScriptRecord,
   Source,
   Story,
   StoryArticle,
@@ -127,7 +126,7 @@ function seedDatabase(db: DbData) {
   db.articles = [];
   db.stories = [];
   db.story_articles = [];
-  db.sequences = { sources: 0, articles: 0, stories: 0, refresh_runs: 0, scripts: 0 };
+  db.sequences = { sources: 0, articles: 0, stories: 0, refresh_runs: 0 };
 
   for (const s of SEED_SOURCES) {
     const id = nextId(db, "sources");
@@ -378,14 +377,6 @@ export function listArchiveDates(): string[] {
   const db = getDb();
   const dates = [...new Set(db.stories.map((s) => s.archive_date))];
   return dates.sort().reverse();
-}
-
-export function saveScript(record: Omit<ScriptRecord, "id">): ScriptRecord {
-  const db = getDb();
-  const row: ScriptRecord = { ...record, id: nextId(db, "scripts") };
-  db.scripts.push(row);
-  saveDb(db);
-  return row;
 }
 
 export function getLastUpdated(): string | null {

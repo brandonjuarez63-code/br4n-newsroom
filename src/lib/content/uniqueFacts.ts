@@ -1,5 +1,5 @@
 /**
- * Shared anti-repetition / anti-padding helpers for summaries and scripts.
+ * Shared anti-repetition / anti-padding helpers for summaries.
  * Presentation-only — does not change ranking, clustering, scores, or URLs.
  */
 import type { Story, StoryWithArticles } from "@/lib/types";
@@ -17,7 +17,7 @@ const STOP = new Set([
   "monday","tuesday","wednesday","thursday","friday","saturday","night","day",
 ]);
 
-/** Generic ranking templates and fluff that must never pad summaries/scripts. */
+/** Generic ranking templates and fluff that must never pad summaries. */
 const FILLER_RES: RegExp[] = [
   /\bawards[- ]season narratives\b/i,
   /\bcareer momentum\b/i,
