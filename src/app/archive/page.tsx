@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { StoryWithArticles } from "@/lib/types";
 import { StoryCard } from "@/components/StoryCard";
+import { BrandMark } from "@/components/BrandMark";
 
 function DeskTop5({
   label,
@@ -94,7 +95,10 @@ export default function ArchivePage() {
       >
         ← Back to newsroom
       </Link>
-      <h1 className="mt-4 text-3xl font-bold tracking-tight text-white">Archive</h1>
+      <div className="mt-4">
+        <BrandMark size="sm" />
+      </div>
+      <h1 className="mt-5 text-3xl font-bold tracking-tight text-white">Archive</h1>
       <p className="mt-1.5 text-sm text-newsroom-muted">
         Pick a date to review that day&apos;s Top 5 for Movies & TV and Gaming.
       </p>

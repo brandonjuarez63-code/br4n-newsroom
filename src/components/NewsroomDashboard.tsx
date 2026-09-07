@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import Link from "next/link";
 import type { Category, StoryWithArticles } from "@/lib/types";
 import { StoryCard } from "./StoryCard";
+import { BrandMark } from "./BrandMark";
 import { formatWhen, cn } from "@/lib/utils";
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -90,10 +91,10 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-newsroom-gold">
             Personal research desk
           </p>
-          <h1 className="mt-1.5 text-3xl font-bold tracking-tight text-white md:text-4xl">
-            BR4N Newsroom
-          </h1>
-          <p className="mt-1.5 max-w-xl text-sm text-newsroom-muted">
+          <div className="mt-1.5">
+            <BrandMark href={null} />
+          </div>
+          <p className="mt-2 max-w-xl text-sm text-newsroom-muted">
             Refresh → verify sources → ranked research desk
           </p>
         </div>
