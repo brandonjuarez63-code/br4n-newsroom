@@ -197,8 +197,8 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
   }
 
   return (
-    <div className="mx-auto max-w-newsroom px-4 py-6 sm:px-6 lg:px-8">
-      <header className="mb-7 flex flex-col gap-5 border-b border-newsroom-border/70 pb-6 md:flex-row md:items-end md:justify-between">
+    <div className="mx-auto max-w-newsroom px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
+      <header className="mb-6 flex flex-col gap-5 border-b border-newsroom-border/70 pb-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-newsroom-gold/90">
             Personal research desk
@@ -228,7 +228,7 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
         </div>
       </header>
 
-      <div className="mb-7 flex flex-wrap items-center gap-3">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
         {(["movies_tv", "gaming"] as Category[]).map((c) => {
           const active = category === c;
           const gaming = c === "gaming";
@@ -267,7 +267,7 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
       {loading ? (
         <p className="text-newsroom-muted">Loading…</p>
       ) : !stories.length ? (
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_16.5rem] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_17.5rem]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_15.5rem] xl:gap-12">
           <p className="text-newsroom-muted">No stories yet. Hit REFRESH NEWS.</p>
           <Sidebar
             category={category}
@@ -278,12 +278,12 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_16.5rem] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_17.5rem]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_15.5rem] xl:gap-12">
           {/* LEFT — main feed */}
           <div className="min-w-0">
             {topStory && (
-              <section className="mb-10 border-b border-newsroom-border/55 pb-10">
-                <div className="mb-4">
+              <section className="mb-6 border-b border-newsroom-border/55 pb-6">
+                <div className="mb-3">
                   <SectionLabel>Top Story</SectionLabel>
                 </div>
                 <StoryCard story={topStory} rank={1} variant="featured" />
@@ -291,19 +291,20 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
             )}
 
             {supporting.length > 0 && (
-              <section className="mb-10 border-b border-newsroom-border/45 pb-8">
+              <section className="mb-6 border-b border-newsroom-border/45 pb-5">
                 <div className="mb-1 flex items-baseline justify-between gap-3">
                   <SectionLabel>Top Stories</SectionLabel>
                   <span className="font-mono text-[11px] tabular-nums text-newsroom-muted/45">
                     02–{String(supporting.length + 1).padStart(2, "0")}
                   </span>
                 </div>
-                <div className="divide-y divide-newsroom-border/40 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-0 md:divide-y-0">
+                <div className="divide-y divide-newsroom-border/40 md:grid md:grid-cols-2 md:items-stretch md:gap-x-8 md:gap-y-0 md:divide-y-0 lg:gap-x-10">
                   {supporting.map((s, i) => (
                     <div
                       key={s.id}
                       className={cn(
-                        "md:border-b md:border-newsroom-border/40",
+                        "flex h-full flex-col md:border-b md:border-newsroom-border/40",
+                        i % 2 === 0 ? "md:pr-1" : "md:pl-1",
                         i >= 2 ? "md:border-b-0" : ""
                       )}
                     >
@@ -314,8 +315,8 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
               </section>
             )}
 
-            <section className="mb-6">
-              <div className="mb-3 flex flex-wrap items-center gap-3 border-b border-newsroom-border/45 pb-3">
+            <section className="mb-5">
+              <div className="mb-2.5 flex flex-wrap items-center gap-3 border-b border-newsroom-border/45 pb-2.5">
                 <SectionLabel>More Stories</SectionLabel>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                   <select

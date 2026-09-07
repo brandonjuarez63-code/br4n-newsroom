@@ -140,9 +140,9 @@ function StoryThumb({
 }) {
   const box =
     size === "featured"
-      ? "aspect-[16/11] w-full sm:aspect-auto sm:h-[14.5rem] sm:w-[22rem] md:h-[16.5rem] md:w-[26rem] lg:h-[18rem] lg:w-[28rem]"
+      ? "aspect-[16/10] w-full sm:aspect-auto sm:h-[15rem] sm:w-[23rem] md:h-[17rem] md:w-[26.5rem] lg:h-[18.5rem] lg:w-[29rem]"
       : size === "supporting"
-        ? "h-[6.25rem] w-[10rem] sm:h-[7.25rem] sm:w-[12rem] md:h-[7.75rem] md:w-[13.5rem]"
+        ? "h-[7rem] w-[11.25rem] sm:h-[8.25rem] sm:w-[13.5rem] md:h-[8.75rem] md:w-[15.25rem]"
         : "h-[3.25rem] w-[4.5rem] sm:h-[3.75rem] sm:w-[5.25rem]";
 
   const img = (
@@ -241,8 +241,8 @@ export function StoryCard({
       <article className="group relative">
         <div
           className={cn(
-            "flex flex-col gap-5",
-            imageUrl ? "lg:flex-row lg:items-start lg:gap-8" : ""
+            "flex flex-col gap-5 sm:gap-6",
+            imageUrl ? "lg:flex-row lg:items-start lg:gap-9" : ""
           )}
         >
           {imageUrl ? (
@@ -257,7 +257,7 @@ export function StoryCard({
           ) : null}
 
           <div className="min-w-0 flex-1">
-            <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+            <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
               {rankLabel && (
                 <span className="font-mono text-sm tabular-nums text-newsroom-gold">
                   #{rank === 1 ? "1" : rankLabel}
@@ -286,9 +286,9 @@ export function StoryCard({
               )}
             </div>
 
-            <Headline className="text-[1.65rem] font-semibold leading-[1.18] tracking-tight text-white text-balance sm:text-3xl md:text-[2.15rem]" />
+            <Headline className="text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-white text-balance sm:text-[2rem] md:text-[2.28rem]" />
 
-            <p className="mt-3.5 max-w-2xl text-[15px] leading-relaxed text-newsroom-muted line-clamp-4 md:line-clamp-5">
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-newsroom-muted line-clamp-4 md:line-clamp-5">
               {story.summary || "information unavailable"}
             </p>
 
@@ -413,8 +413,8 @@ export function StoryCard({
 
   /* ---------- SUPPORTING (#2–#5) — compact editorial rows, not #1 clones ---------- */
   return (
-    <article className="group relative py-4 sm:py-5">
-      <div className="flex gap-3.5 sm:gap-5">
+    <article className="group relative flex h-full flex-col py-3.5 sm:py-4">
+      <div className="flex h-full gap-3.5 sm:gap-4 md:gap-5">
         {rankLabel && (
           <span className="mt-0.5 w-7 shrink-0 font-mono text-xs tabular-nums text-newsroom-gold/65">
             {rankLabel}
@@ -432,7 +432,7 @@ export function StoryCard({
           </div>
         ) : null}
 
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
             <span
               className={cn(
@@ -456,11 +456,11 @@ export function StoryCard({
 
           <Headline className="text-[1.05rem] font-semibold leading-snug tracking-tight text-white text-balance sm:text-lg" />
 
-          <p className="mt-1.5 text-sm leading-relaxed text-newsroom-muted line-clamp-2 sm:line-clamp-3">
+          <p className="mt-1.5 text-sm leading-relaxed text-newsroom-muted line-clamp-2">
             {story.summary || "information unavailable"}
           </p>
 
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <div className="mt-auto pt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {publications.length ? (
               <PublicationChips
                 publications={publications}
