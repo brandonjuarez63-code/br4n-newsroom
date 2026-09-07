@@ -7,13 +7,34 @@
 }
 
 body {
-  background: #0a0a0f;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(245, 197, 66, 0.04), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(56, 189, 248, 0.03), transparent 50%),
+    #0a0a0f;
   color: #e8e8f0;
   min-height: 100vh;
+  font-feature-settings: "ss01" on, "kern" on;
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Quiet focus rings for editorial click targets */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(245, 197, 66, 0.55);
+  outline-offset: 2px;
+}
+
+/* Softer details summary marker */
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
 }

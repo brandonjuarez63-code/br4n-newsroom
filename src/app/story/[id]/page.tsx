@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { getStoryByIdAsync } from "@/lib/db";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StorySummary } from "@/components/StorySummary";
-import { formatWhen, safeArticleHref } from "@/lib/utils";
+import { PublisherLogo, SourceRow } from "@/components/PublisherLogo";
+import { formatWhen, safeArticleHref, cn } from "@/lib/utils";
 import {
   confidenceScoreLine,
   importanceScoreLine,
@@ -38,16 +39,57 @@ export default async function StoryPage({
   const importanceDetails = scoringDetailLines(story.why_importance);
   const confidenceDetails = scoringDetailLines(story.why_confidence);
   const summaries = await synthesizeStorySummaries(story);
+  const isGaming = story.category === "gaming";
+  const primary =
+    articles.find((a) => a?.id === story.primary_article_id) || articles[0];
+  const primaryHref = safeArticleHref(primary?.url);
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <Link href="/" className="text-sm text-newsroom-gold hover:underline">
+    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <Link
+        href="/"
+        className="text-sm text-newsroom-gold transition-colors hover:text-newsroom-gold/80"
+      >
         ← Back to newsroom
       </Link>
+
+      {/* Headline first */}
+      <h1 className="mt-5 text-balance text-3xl font-bold tracking-tight text-white md:text-[2rem] md:leading-tight">
+        {textOrUnavailable(story.headline)}
+      </h1>
+
+      {/* Source / pub / date */}
+      <div className="mt-3">
+        {primary ? (
+          <SourceRow
+            publication={primary.source_name}
+            author={primary.author}
+            date={formatWhen(primary.published_at || story.updated_at)}
+            url={primary.url}
+            twoLine
+          />
+        ) : (
+          <p className="text-sm text-newsroom-muted">{UNAVAILABLE}</p>
+        )}
+      </div>
+
+      {/* Status + confidence (visible, not dominating) */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]",
+            isGaming
+              ? "border-newsroom-electric/25 bg-newsroom-electric/5 text-newsroom-electric/90"
+              : "border-newsroom-gold/25 bg-newsroom-gold/5 text-newsroom-gold/90"
+          )}
+        >
+          {isGaming ? "Gaming" : "Movies & TV"}
+        </span>
         <StatusBadge status={story.status} />
-        <span className="text-xs text-newsroom-muted">
-          {story.category === "movies_tv" ? "Movies & TV" : "Gaming"}
+        <span className="text-[11px] tabular-nums text-newsroom-muted">
+          Importance {story.importance ?? UNAVAILABLE}
+          <span className="mx-1 opacity-40">·</span>
+          Confidence {story.confidence ?? UNAVAILABLE}
         </span>
         {story.is_sample === 1 && (
           <span className="rounded border border-newsroom-border px-1.5 py-0.5 text-[10px] text-newsroom-muted">
@@ -55,25 +97,36 @@ export default async function StoryPage({
           </span>
         )}
       </div>
-      <h1 className="mt-3 text-3xl font-bold text-white">
-        {textOrUnavailable(story.headline)}
-      </h1>
-      <p className="mt-2 text-sm text-newsroom-muted">
-        Importance {story.importance ?? UNAVAILABLE}/100 · Confidence{" "}
-        {story.confidence ?? UNAVAILABLE}/100 · {story.status || UNAVAILABLE}
-      </p>
 
-      <section className="mt-6 space-y-6 rounded-xl border border-newsroom-border bg-newsroom-card p-5">
+      <section className="mt-6 space-y-7 rounded-xl border border-newsroom-border bg-newsroom-card p-5 sm:p-6">
+        {/* Short summary → Read more */}
         <StorySummary
           shortSummary={summaries.short}
           longSummary={summaries.long}
         />
 
+        {primaryHref && (
+          <a
+            href={primaryHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex text-xs font-semibold tracking-wide text-newsroom-electric transition-colors hover:text-newsroom-electric/80"
+          >
+            Read source →
+          </a>
+        )}
+
+        {/* Why it matters */}
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
+          <h2
+            className={cn(
+              "text-[11px] font-semibold uppercase tracking-[0.14em]",
+              isGaming ? "text-newsroom-electric" : "text-newsroom-gold"
+            )}
+          >
             Why it matters
           </h2>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-white">
+          <p className="mt-2 text-lg font-semibold tabular-nums text-white">
             {importanceScoreLine(story)}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-newsroom-muted">
@@ -82,10 +135,15 @@ export default async function StoryPage({
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
+          <h2
+            className={cn(
+              "text-[11px] font-semibold uppercase tracking-[0.14em]",
+              isGaming ? "text-newsroom-electric" : "text-newsroom-gold"
+            )}
+          >
             Confidence
           </h2>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-white">
+          <p className="mt-2 text-lg font-semibold tabular-nums text-white">
             {confidenceScoreLine(story)}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-newsroom-muted">
@@ -93,7 +151,7 @@ export default async function StoryPage({
           </p>
         </div>
 
-        <details className="rounded-lg border border-newsroom-border bg-newsroom-panel p-3">
+        <details className="rounded-lg border border-newsroom-border bg-newsroom-panel/80 p-3.5">
           <summary className="cursor-pointer text-sm font-semibold text-newsroom-gold">
             Technical details
           </summary>
@@ -130,14 +188,16 @@ export default async function StoryPage({
         </details>
       </section>
 
-      <section id="source-breakdown" className="mt-6">
-        <h2 className="mb-3 text-lg font-bold text-white">Source Breakdown</h2>
+      <section id="source-breakdown" className="mt-8 scroll-mt-6">
+        <h2 className="mb-3 text-lg font-bold tracking-tight text-white">
+          Source Breakdown
+        </h2>
         {!articles.length ? (
-          <p className="rounded-lg border border-newsroom-border bg-newsroom-panel p-3 text-sm text-newsroom-muted">
+          <p className="rounded-lg border border-newsroom-border bg-newsroom-panel p-3.5 text-sm text-newsroom-muted">
             Source Breakdown {UNAVAILABLE} for this story.
           </p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-2.5">
             {articles.map((a) => {
               const href = safeArticleHref(a?.url);
               const publication =
@@ -155,13 +215,16 @@ export default async function StoryPage({
               return (
                 <li
                   key={a?.id ?? `${publication}-${title}`}
-                  className="rounded-lg border border-newsroom-border bg-newsroom-panel p-3"
+                  className="rounded-xl border border-newsroom-border bg-newsroom-panel/90 p-3.5 transition-colors hover:border-newsroom-border-strong"
                 >
                   <div className="flex flex-wrap items-center gap-2 text-xs text-newsroom-muted">
-                    <span className="font-semibold text-newsroom-electric">
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-white/90">
+                      <PublisherLogo name={publication} url={a?.url} size="sm" />
                       {publication}
                     </span>
+                    <span className="opacity-50">·</span>
                     <span>Reliability {reliability}</span>
+                    <span className="opacity-50">·</span>
                     <span>{sourceType}</span>
                   </div>
                   {href ? (
@@ -169,19 +232,19 @@ export default async function StoryPage({
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1 block text-sm font-medium text-white hover:text-newsroom-gold"
+                      className="mt-1.5 block text-sm font-medium leading-snug text-white transition-colors hover:text-newsroom-gold"
                     >
                       {title}
                     </a>
                   ) : (
-                    <p className="mt-1 text-sm font-medium text-white">
+                    <p className="mt-1.5 text-sm font-medium text-white">
                       {title}
                       <span className="ml-2 text-xs font-normal text-newsroom-muted">
                         (source link unavailable)
                       </span>
                     </p>
                   )}
-                  <p className="mt-1 text-xs text-newsroom-muted">
+                  <p className="mt-1 text-[11px] text-newsroom-muted">
                     {author} · {formatWhen(a?.published_at)}
                   </p>
                   {href && (
@@ -189,7 +252,7 @@ export default async function StoryPage({
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2 inline-block text-xs font-semibold uppercase tracking-wider text-newsroom-gold hover:underline"
+                      className="mt-2.5 inline-block text-xs font-semibold tracking-wide text-newsroom-gold transition-colors hover:text-newsroom-gold/80"
                     >
                       Read source →
                     </a>

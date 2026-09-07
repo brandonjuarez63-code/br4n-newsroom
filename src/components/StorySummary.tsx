@@ -17,20 +17,20 @@ export function StorySummary({
 
   return (
     <div>
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-newsroom-gold">
         Summary
       </h2>
-      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-newsroom-muted">
+      <p className="mt-2 text-[15px] leading-relaxed text-white/85">
         {expanded && canExpand ? longSummary : shortSummary}
       </p>
       {canExpand && (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-2 text-xs font-semibold uppercase tracking-wider text-newsroom-gold hover:underline"
+          className="mt-2.5 text-xs font-semibold tracking-wide text-newsroom-gold transition-colors hover:text-newsroom-gold/80"
           aria-expanded={expanded}
         >
-          {expanded ? "Read less ▲" : "Read more ▼"}
+          {expanded ? "Read less" : "Read more"}
         </button>
       )}
     </div>
