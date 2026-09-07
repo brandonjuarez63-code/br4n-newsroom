@@ -15,8 +15,8 @@ function categoryLabel(category: Category): string {
 
 function categoryChip(category: Category): string {
   return category === "gaming"
-    ? "text-newsroom-electric/80 border-newsroom-electric/20 bg-newsroom-electric/[0.04]"
-    : "text-newsroom-gold/80 border-newsroom-gold/20 bg-newsroom-gold/[0.04]";
+    ? "text-newsroom-electric/75 border-newsroom-electric/18"
+    : "text-newsroom-gold/75 border-newsroom-gold/18";
 }
 
 function pickImageUrl(story: StoryWithArticles): string | null {
@@ -36,21 +36,14 @@ function pickImageUrl(story: StoryWithArticles): string | null {
 function MetaScores({
   importance,
   confidence,
-  quiet,
 }: {
   importance?: number | null;
   confidence?: number | null;
-  quiet?: boolean;
 }) {
   return (
-    <span
-      className={cn(
-        "tabular-nums text-newsroom-muted/70",
-        quiet ? "text-[10px]" : "text-[11px]"
-      )}
-    >
+    <span className="tabular-nums text-[10px] tracking-wide text-newsroom-muted/55">
       Imp {importance ?? "—"}
-      <span className="mx-1 opacity-35">·</span>
+      <span className="mx-1 opacity-30">·</span>
       Conf {confidence ?? "—"}
     </span>
   );
@@ -71,15 +64,13 @@ function StoryActions({
     <div
       className={cn(
         "flex flex-wrap items-center gap-x-4 gap-y-1.5",
-        compact
-          ? "mt-2"
-          : "mt-3.5 border-t border-newsroom-border/50 pt-3"
+        compact ? "mt-2" : "mt-4 border-t border-newsroom-border/40 pt-3"
       )}
     >
       {breakdownHref ? (
         <Link
           href={breakdownHref}
-          className="text-xs font-medium tracking-wide text-newsroom-gold/90 transition-colors hover:text-newsroom-gold"
+          className="text-xs font-medium tracking-wide text-newsroom-gold/85 transition-colors hover:text-newsroom-gold"
         >
           Source Breakdown →
         </Link>
@@ -91,9 +82,9 @@ function StoryActions({
           href={sourceHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs font-medium tracking-wide text-newsroom-electric/90 transition-colors hover:text-newsroom-electric"
+          className="text-xs font-medium tracking-wide text-newsroom-electric/85 transition-colors hover:text-newsroom-electric"
         >
-          Read source →
+          Read Source →
         </a>
       ) : hasPrimary ? (
         <span className="text-xs text-newsroom-muted">Source link unavailable</span>
@@ -113,7 +104,7 @@ function PublicationChips({
 }) {
   if (!publications.length) return null;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-2">
       {publications.slice(0, limit).map((p) => {
         const art = articles.find((a) => a.source_name === p);
         return (
@@ -127,7 +118,7 @@ function PublicationChips({
         );
       })}
       {publications.length > limit && (
-        <span className="text-[11px] text-newsroom-muted/80">
+        <span className="text-[11px] text-newsroom-muted/70">
           +{publications.length - limit}
         </span>
       )}
@@ -135,7 +126,7 @@ function PublicationChips({
   );
 }
 
-/** Secondary editorial thumb — hides itself on error so parent can fall back to text-only. */
+/** Editorial thumb — hides itself on error so parent falls back to text-only. */
 function StoryThumb({
   src,
   href,
@@ -149,9 +140,9 @@ function StoryThumb({
 }) {
   const box =
     size === "featured"
-      ? "h-[7.25rem] w-[11.25rem] sm:h-[8.5rem] sm:w-[13.5rem] md:h-[9.5rem] md:w-[15rem]"
+      ? "aspect-[16/11] w-full sm:aspect-auto sm:h-[14.5rem] sm:w-[22rem] md:h-[16.5rem] md:w-[26rem] lg:h-[18rem] lg:w-[28rem]"
       : size === "supporting"
-        ? "h-[5.75rem] w-[9rem] sm:h-[6.5rem] sm:w-[11rem]"
+        ? "h-[6.25rem] w-[10rem] sm:h-[7.25rem] sm:w-[12rem] md:h-[7.75rem] md:w-[13.5rem]"
         : "h-[3.25rem] w-[4.5rem] sm:h-[3.75rem] sm:w-[5.25rem]";
 
   const img = (
@@ -169,7 +160,8 @@ function StoryThumb({
   return (
     <div
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-md bg-newsroom-panel/50 ring-1 ring-newsroom-border/45",
+        "relative shrink-0 overflow-hidden bg-newsroom-panel/40",
+        size === "featured" ? "rounded-md" : "rounded",
         box
       )}
     >
@@ -243,18 +235,37 @@ export function StoryCard({
     </h3>
   );
 
-  /* ---------- FEATURED (#1) ---------- */
+  /* ---------- FEATURED (#1 Top Story) ---------- */
   if (variant === "featured") {
     return (
-      <article className="group relative overflow-hidden rounded-xl border border-newsroom-border/60 bg-newsroom-card/70 shadow-card">
-        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:gap-5 sm:p-6 md:gap-6 md:p-7">
+      <article className="group relative">
+        <div
+          className={cn(
+            "flex flex-col gap-5",
+            imageUrl ? "lg:flex-row lg:items-start lg:gap-8" : ""
+          )}
+        >
+          {imageUrl ? (
+            <div className="order-first w-full shrink-0 sm:w-auto lg:order-last">
+              <StoryThumb
+                src={imageUrl}
+                href={storyHref}
+                size="featured"
+                onFail={() => setImgFailed(true)}
+              />
+            </div>
+          ) : null}
+
           <div className="min-w-0 flex-1">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
               {rankLabel && (
-                <span className="font-mono text-xs tabular-nums text-newsroom-gold/80">
-                  {rankLabel}
+                <span className="font-mono text-sm tabular-nums text-newsroom-gold">
+                  #{rank === 1 ? "1" : rankLabel}
                 </span>
               )}
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-newsroom-gold/90">
+                Top Story
+              </span>
               <span
                 className={cn(
                   "rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em]",
@@ -267,23 +278,22 @@ export function StoryCard({
               <MetaScores
                 importance={story.importance}
                 confidence={story.confidence}
-                quiet
               />
               {story.is_sample === 1 && (
-                <span className="rounded border border-newsroom-border px-1.5 py-0.5 text-[10px] text-newsroom-muted">
+                <span className="rounded border border-newsroom-border/70 px-1.5 py-0.5 text-[10px] text-newsroom-muted">
                   SAMPLE
                 </span>
               )}
             </div>
 
-            <Headline className="text-2xl font-semibold leading-[1.2] tracking-tight text-white text-balance sm:text-3xl md:text-[2rem]" />
+            <Headline className="text-[1.65rem] font-semibold leading-[1.18] tracking-tight text-white text-balance sm:text-3xl md:text-[2.15rem]" />
 
-            <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-newsroom-muted line-clamp-3 md:line-clamp-4">
+            <p className="mt-3.5 max-w-2xl text-[15px] leading-relaxed text-newsroom-muted line-clamp-4 md:line-clamp-5">
               {story.summary || "information unavailable"}
             </p>
 
-            <p className="mt-3 text-sm leading-relaxed text-newsroom-muted/90">
-              <span className="font-medium text-white/70">Why it matters</span>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-newsroom-muted/85">
+              <span className="font-medium text-white/65">Why it matters</span>
               <span className="mx-1.5 text-newsroom-border">—</span>
               {story.why_it_matters || "information unavailable"}
             </p>
@@ -307,7 +317,7 @@ export function StoryCard({
                   information unavailable
                 </span>
               )}
-              <span className="text-[11px] text-newsroom-muted/65">
+              <span className="text-[11px] text-newsroom-muted/55">
                 Updated {formatWhen(story.updated_at)}
               </span>
             </div>
@@ -318,17 +328,6 @@ export function StoryCard({
               hasPrimary={Boolean(primary)}
             />
           </div>
-
-          {imageUrl ? (
-            <div className="self-start sm:pt-1">
-              <StoryThumb
-                src={imageUrl}
-                href={storyHref}
-                size="featured"
-                onFail={() => setImgFailed(true)}
-              />
-            </div>
-          ) : null}
         </div>
       </article>
     );
@@ -337,10 +336,10 @@ export function StoryCard({
   /* ---------- COMPACT (More Stories) ---------- */
   if (variant === "compact") {
     return (
-      <article className="group relative py-3.5 transition-colors hover:bg-newsroom-card/25 sm:px-1">
+      <article className="group relative py-3.5 transition-colors hover:bg-white/[0.015] sm:px-1">
         <div className="flex gap-3 sm:gap-4">
           {typeof rank === "number" && (
-            <span className="mt-0.5 w-6 shrink-0 font-mono text-[11px] tabular-nums text-newsroom-muted/45">
+            <span className="mt-0.5 w-6 shrink-0 font-mono text-[11px] tabular-nums text-newsroom-muted/40">
               {rankLabel}
             </span>
           )}
@@ -358,10 +357,9 @@ export function StoryCard({
               <MetaScores
                 importance={story.importance}
                 confidence={story.confidence}
-                quiet
               />
               {story.is_sample === 1 && (
-                <span className="text-[9px] uppercase tracking-wide text-newsroom-muted/70">
+                <span className="text-[9px] uppercase tracking-wide text-newsroom-muted/65">
                   Sample
                 </span>
               )}
@@ -413,17 +411,29 @@ export function StoryCard({
     );
   }
 
-  /* ---------- SUPPORTING (#2–#5) ---------- */
+  /* ---------- SUPPORTING (#2–#5) — compact editorial rows, not #1 clones ---------- */
   return (
-    <article className="group relative flex h-full flex-col rounded-lg border border-newsroom-border/35 bg-newsroom-panel/30 px-4 py-4 transition-colors hover:border-newsroom-border/60 hover:bg-newsroom-card/50 sm:px-5 sm:py-5">
-      <div className="flex gap-3 sm:gap-4">
+    <article className="group relative py-4 sm:py-5">
+      <div className="flex gap-3.5 sm:gap-5">
+        {rankLabel && (
+          <span className="mt-0.5 w-7 shrink-0 font-mono text-xs tabular-nums text-newsroom-gold/65">
+            {rankLabel}
+          </span>
+        )}
+
+        {imageUrl ? (
+          <div className="self-start">
+            <StoryThumb
+              src={imageUrl}
+              href={storyHref}
+              size="supporting"
+              onFail={() => setImgFailed(true)}
+            />
+          </div>
+        ) : null}
+
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            {rankLabel && (
-              <span className="font-mono text-xs tabular-nums text-newsroom-gold/70">
-                {rankLabel}
-              </span>
-            )}
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
             <span
               className={cn(
                 "rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em]",
@@ -436,61 +446,50 @@ export function StoryCard({
             <MetaScores
               importance={story.importance}
               confidence={story.confidence}
-              quiet
             />
             {story.is_sample === 1 && (
-              <span className="rounded border border-newsroom-border px-1.5 py-0.5 text-[10px] text-newsroom-muted">
+              <span className="rounded border border-newsroom-border/70 px-1.5 py-0.5 text-[10px] text-newsroom-muted">
                 SAMPLE
               </span>
             )}
           </div>
 
-          <Headline className="text-base font-semibold leading-snug tracking-tight text-white text-balance sm:text-[1.05rem]" />
+          <Headline className="text-[1.05rem] font-semibold leading-snug tracking-tight text-white text-balance sm:text-lg" />
 
-          <p className="mt-2 text-sm leading-relaxed text-newsroom-muted line-clamp-3">
+          <p className="mt-1.5 text-sm leading-relaxed text-newsroom-muted line-clamp-2 sm:line-clamp-3">
             {story.summary || "information unavailable"}
           </p>
-        </div>
 
-        {imageUrl ? (
-          <div className="self-start">
-            <StoryThumb
-              src={imageUrl}
-              href={storyHref}
-              size="supporting"
-              onFail={() => setImgFailed(true)}
-            />
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {publications.length ? (
+              <PublicationChips
+                publications={publications}
+                articles={articles}
+                limit={3}
+              />
+            ) : primary ? (
+              <SourceRow
+                publication={primary.source_name}
+                author={primary.author}
+                date={formatWhen(primary.published_at || story.updated_at)}
+                url={primary.url}
+              />
+            ) : (
+              <span className="text-[11px] text-newsroom-muted">information unavailable</span>
+            )}
+            <span className="text-[11px] text-newsroom-muted/55">
+              Updated {formatWhen(story.updated_at)}
+            </span>
           </div>
-        ) : null}
-      </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        {publications.length ? (
-          <PublicationChips
-            publications={publications}
-            articles={articles}
-            limit={3}
+          <StoryActions
+            breakdownHref={breakdownHref}
+            sourceHref={sourceHref}
+            hasPrimary={Boolean(primary)}
+            compact
           />
-        ) : primary ? (
-          <SourceRow
-            publication={primary.source_name}
-            author={primary.author}
-            date={formatWhen(primary.published_at || story.updated_at)}
-            url={primary.url}
-          />
-        ) : (
-          <span className="text-[11px] text-newsroom-muted">information unavailable</span>
-        )}
-        <span className="text-[11px] text-newsroom-muted/65">
-          Updated {formatWhen(story.updated_at)}
-        </span>
+        </div>
       </div>
-
-      <StoryActions
-        breakdownHref={breakdownHref}
-        sourceHref={sourceHref}
-        hasPrimary={Boolean(primary)}
-      />
     </article>
   );
 }

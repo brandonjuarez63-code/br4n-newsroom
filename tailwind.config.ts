@@ -36,10 +36,10 @@ const config: Config = {
         ],
       },
       maxWidth: {
-        newsroom: "72rem",
+        newsroom: "88rem",
       },
       boxShadow: {
-        card: "0 1px 0 rgba(255,255,255,0.03), 0 8px 24px rgba(0,0,0,0.25)",
+        card: "0 1px 0 rgba(255,255,255,0.025), 0 12px 32px rgba(0,0,0,0.28)",
       },
     },
   },
