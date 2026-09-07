@@ -10,7 +10,15 @@ import type {
   StoryWithArticles,
 } from "@/lib/types";
 import { SEED_SOURCES, SAMPLE_BUNDLE, SOURCE_RENAMES } from "@/lib/sources/seed";
-import { ensureHydrated, getStorageMode, readStoreSync, writeStoreSync } from "@/lib/db/store";
+import {
+  ensureHydrated,
+  getStorageMode,
+  invalidateMemoryCache,
+  peekMemoryCache,
+  readStoreSync,
+  writeStoreAsync,
+  writeStoreSync,
+} from "@/lib/db/store";
 
 function readRaw(): DbData {
   return readStoreSync();
@@ -97,6 +105,11 @@ function reconcileSources(db: DbData): boolean {
 
 export function saveDb(db: DbData) {
   writeRaw(db);
+}
+
+/** Persist and await remote (Blob/Turso) so other isolates can read fresh data. */
+export async function saveDbAsync(db: DbData) {
+  await writeStoreAsync(db);
 }
 
 /** Hydrate remote store (Turso/Blob) once per isolate, then return ready db. */
@@ -258,7 +271,7 @@ export function createRefreshRun(category: string): RefreshRun {
   return run;
 }
 
-export function finishRefreshRun(
+export async function finishRefreshRun(
   id: number,
   patch: Partial<RefreshRun>
 ) {
@@ -266,10 +279,10 @@ export function finishRefreshRun(
   const run = db.refresh_runs.find((r) => r.id === id);
   if (run) {
     Object.assign(run, patch, { finished_at: new Date().toISOString() });
-    if (patch.status === "ok") {
+    if (patch.status === "ok" || patch.status === "partial") {
       db.meta.last_updated = run.finished_at;
     }
-    saveDb(db);
+    await saveDbAsync(db);
   }
 }
 
@@ -309,6 +322,33 @@ export function getStoryById(id: number): StoryWithArticles | null {
   const s = db.stories.find((x) => x.id === id);
   if (!s) return null;
   return hydrateStory(db, s);
+}
+
+/**
+ * Story lookup with remote rehydrate-on-miss.
+ * Fixes Source Breakdown 404s when a warm isolate still has stale/empty memory
+ * while Blob/Turso already has the refreshed story.
+ */
+export async function getStoryByIdAsync(id: number): Promise<StoryWithArticles | null> {
+  if (!Number.isFinite(id) || id <= 0) return null;
+  await ensureStoreReady();
+  let hit = getStoryById(id);
+  if (hit) return hit;
+
+  const mode = getStorageMode();
+  if (mode !== "blob" && mode !== "turso") return null;
+
+  invalidateMemoryCache();
+  await ensureHydrated({ force: true });
+  const raw = peekMemoryCache();
+  if (raw?.meta?.seeded && raw.stories?.length) {
+    // Use remote snapshot directly — do not seed-overwrite a populated store
+    const s = raw.stories.find((x) => x.id === id);
+    if (s) return hydrateStory(raw, s);
+    return null;
+  }
+  // Remote empty: fall back to normal getDb seeding for bootstrap only
+  return getStoryById(id);
 }
 
 function articlesForStory(db: DbData, storyId: number): Article[] {

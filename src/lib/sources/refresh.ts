@@ -6,6 +6,7 @@ import {
   listSources,
   replaceStoriesForCategory,
   saveDb,
+  saveDbAsync,
   todayArchiveDate,
   upsertArticle,
 } from "@/lib/db";
@@ -20,7 +21,7 @@ export async function refreshCategory(category: Category) {
     const { articles: fetched, errors, skipped_irrelevant, skipped_bad_url } = await fetchCategoryFeeds(sources);
     const db = getDb();
     const saved = fetched.map((a) => upsertArticle(db, a));
-    saveDb(db);
+    await saveDbAsync(db);
 
     const sourcesById = new Map(db.sources.map((s) => [s.id, s]));
     const archiveDate = todayArchiveDate();
@@ -59,12 +60,12 @@ export async function refreshCategory(category: Category) {
       }));
 
       replaceStoriesForCategory(db, category, archiveDate, stories, links);
-      saveDb(db);
+      await saveDbAsync(db);
       storyCount = stories.length;
     }
 
     const errMsg = errors.length ? errors.map((e) => e.error).join("; ") : null;
-    finishRefreshRun(run.id, {
+    await finishRefreshRun(run.id, {
       status: saved.length > 0 ? "ok" : errors.length ? "partial" : "ok",
       article_count: saved.length,
       story_count: storyCount,
@@ -82,7 +83,7 @@ export async function refreshCategory(category: Category) {
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "refresh failed";
-    finishRefreshRun(run.id, {
+    await finishRefreshRun(run.id, {
       status: "error",
       article_count: 0,
       story_count: 0,

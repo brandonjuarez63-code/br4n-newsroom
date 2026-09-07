@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureStoreReady, getStoryById } from "@/lib/db";
+import { getStoryByIdAsync } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -7,9 +7,16 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
-  await ensureStoreReady();
   const { id } = await ctx.params;
-  const story = getStoryById(Number(id));
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const story = await getStoryByIdAsync(numericId);
   if (!story) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // Guard: never return another story's payload
+  if (story.id !== numericId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   return NextResponse.json({ story });
 }

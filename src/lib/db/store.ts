@@ -24,9 +24,13 @@ function localFilePath(): string {
 }
 
 function storageMode(): "blob" | "turso" | "tmp" | "fs" {
-  if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) return "turso";
-  if (process.env.BLOB_READ_WRITE_TOKEN) return "blob";
-  if (isVercel()) return "tmp";
+  const wantRemote =
+    isVercel() || process.env.NEWSROOM_FORCE_REMOTE === "1";
+  if (wantRemote) {
+    if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) return "turso";
+    if (process.env.BLOB_READ_WRITE_TOKEN) return "blob";
+    if (isVercel()) return "tmp";
+  }
   return "fs";
 }
 
@@ -74,15 +78,21 @@ function writeFs(file: string, db: DbData) {
 
 async function readBlob(): Promise<DbData> {
   const token = process.env.BLOB_READ_WRITE_TOKEN!;
-  // List blobs with prefix, or try known URL from env / cache
   const url =
     process.env.NEWSROOM_BLOB_URL ||
     blobUrlCache ||
     (await findBlobUrl(token));
   if (!url) return emptyDb();
   blobUrlCache = url;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) return emptyDb();
+  // Private blob stores require Authorization on download
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    console.error("[newsroom store] blob read failed", res.status);
+    return emptyDb();
+  }
   try {
     return (await res.json()) as DbData;
   } catch {
@@ -92,8 +102,10 @@ async function readBlob(): Promise<DbData> {
 
 async function findBlobUrl(token: string): Promise<string | null> {
   try {
+    // Prefix must keep "/" unescaped — encodeURIComponent on the full path breaks listing.
+    const prefix = "newsroom/";
     const res = await fetch(
-      `https://blob.vercel-storage.com?prefix=${encodeURIComponent(BLOB_PATHNAME)}`,
+      `https://blob.vercel-storage.com?prefix=${encodeURIComponent(prefix).replace(/%2F/gi, "/")}`,
       {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
@@ -101,7 +113,10 @@ async function findBlobUrl(token: string): Promise<string | null> {
     );
     if (!res.ok) return null;
     const data = (await res.json()) as { blobs?: { pathname: string; url: string }[] };
-    const hit = data.blobs?.find((b) => b.pathname === BLOB_PATHNAME || b.pathname.endsWith("newsroom.json"));
+    const hit =
+      data.blobs?.find((b) => b.pathname === BLOB_PATHNAME) ||
+      data.blobs?.find((b) => b.pathname.endsWith("newsroom.json")) ||
+      data.blobs?.[0];
     return hit?.url || null;
   } catch {
     return null;
@@ -118,7 +133,8 @@ async function writeBlob(db: DbData): Promise<void> {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        "x-vercel-blob-access": "public",
+        // Store is private — authenticated reads only
+        "x-vercel-blob-access": "private",
       },
       body,
     }
@@ -208,6 +224,21 @@ export function writeStoreSync(db: DbData) {
   });
 }
 
+/** Await remote persist (Blob/Turso). Prefer this after refresh. */
+export async function writeStoreAsync(db: DbData): Promise<void> {
+  memoryCache = db;
+  const mode = storageMode();
+  if (mode === "fs") {
+    writeFs(localFilePath(), db);
+    return;
+  }
+  if (mode === "tmp") {
+    writeFs(TMP_FILE, db);
+    return;
+  }
+  await persistRemote(db);
+}
+
 async function persistRemote(db: DbData) {
   const mode = storageMode();
   if (mode === "blob") await writeBlob(db);
@@ -216,14 +247,17 @@ async function persistRemote(db: DbData) {
 
 let hydratePromise: Promise<void> | null = null;
 
-/** Load remote store into memory once per isolate (Blob / Turso). */
-export async function ensureHydrated(): Promise<void> {
+/** Load remote store into memory (Blob / Turso). Pass force to bypass warm cache. */
+export async function ensureHydrated(opts?: { force?: boolean }): Promise<void> {
   const mode = storageMode();
   if (mode === "fs" || mode === "tmp") {
-    if (!memoryCache) memoryCache = readStoreSync();
+    if (!memoryCache || opts?.force) memoryCache = readStoreSync();
     return;
   }
-  if (memoryCache?.meta?.seeded) return;
+  if (!opts?.force && memoryCache?.meta?.seeded) return;
+  if (opts?.force) {
+    hydratePromise = null;
+  }
   if (!hydratePromise) {
     hydratePromise = (async () => {
       try {
@@ -240,4 +274,9 @@ export async function ensureHydrated(): Promise<void> {
 export function invalidateMemoryCache() {
   memoryCache = null;
   hydratePromise = null;
+}
+
+/** Peek current memory without seeding (may be null). */
+export function peekMemoryCache(): DbData | null {
+  return memoryCache;
 }
