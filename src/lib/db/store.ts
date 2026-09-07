@@ -236,6 +236,7 @@ export function writeStoreSync(db: DbData) {
 /** Await remote persist (Blob/Turso). Prefer this after refresh. */
 export async function writeStoreAsync(db: DbData): Promise<void> {
   memoryCache = db;
+  lastHydratedAt = Date.now();
   const mode = storageMode();
   if (mode === "fs") {
     writeFs(localFilePath(), db);
@@ -255,6 +256,9 @@ async function persistRemote(db: DbData) {
 }
 
 let hydratePromise: Promise<void> | null = null;
+let lastHydratedAt = 0;
+/** Soft TTL so isolates pick up post-refresh image_url without waiting for cold start. */
+const HYDRATE_TTL_MS = 12_000;
 
 /** Load remote store into memory (Blob / Turso). Pass force to bypass warm cache. */
 export async function ensureHydrated(opts?: { force?: boolean }): Promise<void> {
@@ -263,17 +267,23 @@ export async function ensureHydrated(opts?: { force?: boolean }): Promise<void> 
     if (!memoryCache || opts?.force) memoryCache = readStoreSync();
     return;
   }
-  if (!opts?.force && memoryCache?.meta?.seeded) return;
-  if (opts?.force) {
+  const freshEnough =
+    !opts?.force &&
+    !!memoryCache?.meta?.seeded &&
+    Date.now() - lastHydratedAt < HYDRATE_TTL_MS;
+  if (freshEnough) return;
+  if (opts?.force || Date.now() - lastHydratedAt >= HYDRATE_TTL_MS) {
     hydratePromise = null;
   }
   if (!hydratePromise) {
     hydratePromise = (async () => {
       try {
         memoryCache = mode === "blob" ? await readBlob() : await readTurso();
+        lastHydratedAt = Date.now();
       } catch (e) {
         console.error("[newsroom store] hydrate failed", e);
         memoryCache = emptyDb();
+        lastHydratedAt = 0;
       }
     })();
   }
@@ -283,6 +293,7 @@ export async function ensureHydrated(opts?: { force?: boolean }): Promise<void> 
 export function invalidateMemoryCache() {
   memoryCache = null;
   hydratePromise = null;
+  lastHydratedAt = 0;
 }
 
 /** Peek current memory without seeding (may be null). */
