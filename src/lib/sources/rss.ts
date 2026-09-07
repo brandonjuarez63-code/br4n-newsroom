@@ -10,6 +10,12 @@ const parser = new Parser({
     "User-Agent": "BR4N-Newsroom/1.0 (+local MVP research bot)",
     Accept: "application/rss+xml, application/xml, text/xml, */*",
   },
+  customFields: {
+    item: [
+      ["media:content", "mediaContent", { keepArray: true }],
+      ["media:thumbnail", "mediaThumbnail", { keepArray: true }],
+    ],
+  },
 });
 
 const PUB_PREFIXES = [
@@ -35,6 +41,69 @@ const PUB_PREFIXES = [
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Pick a legitimate image URL from RSS enclosure / media fields only — never scrape HTML. */
+function extractImageUrl(item: Parser.Item): string | null {
+  const extra = item as Parser.Item & {
+    enclosure?: { url?: string; type?: string };
+    mediaContent?: unknown;
+    mediaThumbnail?: unknown;
+  };
+
+  const tryUrl = (raw: unknown): string | null => {
+    if (!raw) return null;
+    if (typeof raw === "string") {
+      const u = raw.trim();
+      if (/^https?:\/\//i.test(u)) return u;
+      return null;
+    }
+    if (typeof raw === "object") {
+      const o = raw as Record<string, unknown>;
+      const attrs = (o.$ || o) as Record<string, unknown>;
+      const url = attrs.url || attrs.href || o.url;
+      if (typeof url === "string" && /^https?:\/\//i.test(url.trim())) return url.trim();
+    }
+    return null;
+  };
+
+  const enclosure = extra.enclosure || item.enclosure;
+  if (enclosure?.url) {
+    const type = String(enclosure.type || "").toLowerCase();
+    if (!type || type.startsWith("image/") || /\.(jpe?g|png|gif|webp|avif)(\?|$)/i.test(enclosure.url)) {
+      const u = tryUrl(enclosure.url);
+      if (u) return u;
+    }
+  }
+
+  const thumbs = extra.mediaThumbnail;
+  if (Array.isArray(thumbs)) {
+    for (const t of thumbs) {
+      const u = tryUrl(t);
+      if (u) return u;
+    }
+  } else {
+    const u = tryUrl(thumbs);
+    if (u) return u;
+  }
+
+  const contents = extra.mediaContent;
+  if (Array.isArray(contents)) {
+    for (const c of contents) {
+      const o = c as Record<string, unknown>;
+      const attrs = (o?.$ || o || {}) as Record<string, unknown>;
+      const type = String(attrs.type || attrs.medium || "").toLowerCase();
+      const url = tryUrl(c);
+      if (!url) continue;
+      if (!type || type === "image" || type.startsWith("image/")) return url;
+      if (/\.(jpe?g|png|gif|webp|avif)(\?|$)/i.test(url)) return url;
+    }
+  } else {
+    const u = tryUrl(contents);
+    if (u) return u;
+  }
+
+  return null;
 }
 
 /** Clean CMS glitches like "Varietyschneider" (pub name concatenated with byline). */
@@ -158,6 +227,7 @@ export async function fetchSourceFeed(
         category: source.category as Category,
         tags: extractTags(title, summary),
         is_sample: 0,
+        image_url: extractImageUrl(item),
       });
     }
 

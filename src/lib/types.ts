@@ -32,6 +32,8 @@ export interface Article {
   category: Category;
   tags: string[];
   is_sample: number;
+  /** Optional OG/RSS media URL when present in feed (enclosure / media:thumbnail). */
+  image_url?: string | null;
 }
 
 export interface Story {

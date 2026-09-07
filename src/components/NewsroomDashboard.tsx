@@ -1,10 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { Category, StoryWithArticles } from "@/lib/types";
 import { StoryCard } from "./StoryCard";
 import { formatWhen, cn } from "@/lib/utils";
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-newsroom-muted/80">
+      {children}
+    </p>
+  );
+}
 
 export function NewsroomDashboard({ initialCategory }: { initialCategory: Category }) {
   const [category, setCategory] = useState<Category>(initialCategory);
@@ -38,8 +46,15 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
     load();
   }, [load]);
 
-  const top5 = useMemo(() => stories.slice(0, 5), [stories]);
+  const topStory = useMemo(() => stories[0] ?? null, [stories]);
+  const supporting = useMemo(() => stories.slice(1, 5), [stories]);
+  const moreStories = useMemo(() => stories.slice(5), [stories]);
   const isGaming = category === "gaming";
+
+  const supportingRange =
+    supporting.length > 0
+      ? `02–${String(supporting.length + 1).padStart(2, "0")}`
+      : null;
 
   async function onRefresh() {
     setRefreshing(true);
@@ -51,7 +66,6 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
       const r = json.results?.[0];
       const errN = Array.isArray(r?.errors) ? r.errors.length : 0;
       const skipN = r?.skipped_irrelevant || 0;
-      const badUrlN = r?.skipped_bad_url || 0;
       setMessage(
         r
           ? `Refresh done: ${r.article_count} articles → ${r.story_count} stories${
@@ -71,7 +85,7 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
 
   return (
     <div className="mx-auto max-w-newsroom px-4 py-6 sm:px-6 lg:px-8">
-      <header className="mb-8 flex flex-col gap-5 border-b border-newsroom-border pb-6 md:flex-row md:items-end md:justify-between">
+      <header className="mb-8 flex flex-col gap-5 border-b border-newsroom-border/80 pb-6 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-newsroom-gold">
             Personal research desk
@@ -100,7 +114,7 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
         </div>
       </header>
 
-      <div className="mb-7 flex flex-wrap items-center gap-3">
+      <div className="mb-8 flex flex-wrap items-center gap-3">
         {(["movies_tv", "gaming"] as Category[]).map((c) => {
           const active = category === c;
           const gaming = c === "gaming";
@@ -124,82 +138,97 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
         <span className="text-[11px] uppercase tracking-wider text-newsroom-muted">
           Last updated {formatWhen(lastUpdated)}
         </span>
+        <span className="hidden text-[11px] text-newsroom-muted/50 sm:inline">
+          · {isGaming ? "Gaming desk" : "Movies & TV desk"}
+        </span>
       </div>
 
       {message && (
-        <div className="mb-5 rounded-lg border border-newsroom-border bg-newsroom-panel px-3.5 py-2.5 text-sm text-newsroom-muted">
+        <div className="mb-6 rounded-lg border border-newsroom-border/70 bg-newsroom-panel/60 px-3.5 py-2.5 text-sm text-newsroom-muted">
           {message}
         </div>
       )}
 
-      <section
-        className={cn(
-          "mb-10 rounded-2xl border border-newsroom-border/80 p-4 sm:p-5",
-          isGaming
-            ? "bg-gradient-to-b from-newsroom-electric/[0.04] to-transparent"
-            : "bg-gradient-to-b from-newsroom-gold/[0.04] to-transparent"
-        )}
-      >
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <p
-              className={cn(
-                "text-[11px] font-semibold uppercase tracking-[0.16em]",
-                isGaming ? "text-newsroom-electric" : "text-newsroom-gold"
-              )}
-            >
-              {isGaming ? "Gaming desk" : "Movies & TV desk"}
-            </p>
-            <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Top 5</h2>
-          </div>
-        </div>
-        {loading ? (
-          <p className="text-newsroom-muted">Loading…</p>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {top5.map((s, i) => (
-              <StoryCard
-                key={s.id}
-                story={s}
-                rank={i + 1}
-                featured={i === 0}
-              />
-            ))}
-            {!top5.length && (
-              <p className="text-newsroom-muted md:col-span-2">
-                No stories yet. Hit REFRESH NEWS.
+      {loading ? (
+        <p className="text-newsroom-muted">Loading…</p>
+      ) : !stories.length ? (
+        <p className="text-newsroom-muted">No stories yet. Hit REFRESH NEWS.</p>
+      ) : (
+        <>
+          {topStory && (
+            <section className="mb-9">
+              <div className="mb-3">
+                <SectionLabel>Top story</SectionLabel>
+              </div>
+              <StoryCard story={topStory} rank={1} variant="featured" />
+            </section>
+          )}
+
+          {supporting.length > 0 && (
+            <section className="mb-10">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <SectionLabel>Top stories</SectionLabel>
+                {supportingRange && (
+                  <span className="font-mono text-[11px] tabular-nums text-newsroom-muted/50">
+                    {supportingRange}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
+                {supporting.map((s, i) => (
+                  <StoryCard
+                    key={s.id}
+                    story={s}
+                    rank={i + 2}
+                    variant="supporting"
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="mb-10">
+            <div className="mb-3 flex flex-wrap items-center gap-3 border-b border-newsroom-border/50 pb-3">
+              <SectionLabel>More stories</SectionLabel>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="rounded-md border border-newsroom-border bg-newsroom-panel px-2.5 py-1.5 text-sm text-white"
+                >
+                  <option value="importance">Importance</option>
+                  <option value="newest">Newest</option>
+                  <option value="confidence">Confidence</option>
+                  <option value="reported">Reported</option>
+                </select>
+                <input
+                  value={tag}
+                  onChange={(e) => setTag(e.target.value)}
+                  placeholder="Filter tag…"
+                  className="rounded-md border border-newsroom-border bg-newsroom-panel px-2.5 py-1.5 text-sm text-white placeholder:text-newsroom-muted"
+                />
+              </div>
+            </div>
+
+            {moreStories.length ? (
+              <div className="divide-y divide-newsroom-border/40">
+                {moreStories.map((s, i) => (
+                  <StoryCard
+                    key={s.id}
+                    story={s}
+                    rank={i + 6}
+                    variant="compact"
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="py-4 text-sm text-newsroom-muted">
+                No additional stories beyond the top five.
               </p>
             )}
-          </div>
-        )}
-      </section>
-
-      <section className="mb-10">
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <h2 className="text-xl font-bold tracking-tight text-white">Full feed</h2>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            className="rounded-md border border-newsroom-border bg-newsroom-panel px-2.5 py-1.5 text-sm text-white"
-          >
-            <option value="importance">Importance</option>
-            <option value="newest">Newest</option>
-            <option value="confidence">Confidence</option>
-            <option value="reported">Reported</option>
-          </select>
-          <input
-            value={tag}
-            onChange={(e) => setTag(e.target.value)}
-            placeholder="Filter tag…"
-            className="rounded-md border border-newsroom-border bg-newsroom-panel px-2.5 py-1.5 text-sm text-white placeholder:text-newsroom-muted"
-          />
-        </div>
-        <div className="grid gap-2.5">
-          {stories.map((s) => (
-            <StoryCard key={s.id} story={s} compact />
-          ))}
-        </div>
-      </section>
+          </section>
+        </>
+      )}
     </div>
   );
 }

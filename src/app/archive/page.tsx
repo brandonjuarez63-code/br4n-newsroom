@@ -5,6 +5,61 @@ import Link from "next/link";
 import type { StoryWithArticles } from "@/lib/types";
 import { StoryCard } from "@/components/StoryCard";
 
+function DeskTop5({
+  label,
+  accent,
+  stories,
+}: {
+  label: string;
+  accent: "gold" | "electric";
+  stories: StoryWithArticles[];
+}) {
+  const top = stories[0];
+  const supporting = stories.slice(1, 5);
+  const accentClass =
+    accent === "electric" ? "text-newsroom-electric" : "text-newsroom-gold";
+  const wash =
+    accent === "electric"
+      ? "from-newsroom-electric/[0.04]"
+      : "from-newsroom-gold/[0.04]";
+
+  return (
+    <section
+      className={`mt-8 rounded-2xl border border-newsroom-border/80 bg-gradient-to-b ${wash} to-transparent p-4 sm:p-5`}
+    >
+      <p
+        className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${accentClass}`}
+      >
+        {label}
+      </p>
+      <h2 className="mb-4 mt-1 text-xl font-bold tracking-tight text-white">Top 5</h2>
+      {!stories.length ? (
+        <p className="text-newsroom-muted">No stories for this date.</p>
+      ) : (
+        <>
+          {top && (
+            <div className="mb-4">
+              <StoryCard story={top} rank={1} variant="featured" />
+            </div>
+          )}
+          {supporting.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
+              {supporting.map((s, i) => (
+                <StoryCard
+                  key={s.id}
+                  story={s}
+                  rank={i + 2}
+                  variant="supporting"
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function ArchivePage() {
   const [dates, setDates] = useState<string[]>([]);
   const [date, setDate] = useState("");
@@ -57,35 +112,8 @@ export default function ArchivePage() {
         </select>
       </div>
 
-      <section className="mt-8 rounded-2xl border border-newsroom-border/80 bg-gradient-to-b from-newsroom-gold/[0.04] to-transparent p-4 sm:p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-newsroom-gold">
-          Movies & TV desk
-        </p>
-        <h2 className="mb-4 mt-1 text-xl font-bold tracking-tight text-white">Top 5</h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          {movies.map((s, i) => (
-            <StoryCard key={s.id} story={s} rank={i + 1} featured={i === 0} />
-          ))}
-          {!movies.length && (
-            <p className="text-newsroom-muted md:col-span-2">No stories for this date.</p>
-          )}
-        </div>
-      </section>
-
-      <section className="mt-8 rounded-2xl border border-newsroom-border/80 bg-gradient-to-b from-newsroom-electric/[0.04] to-transparent p-4 sm:p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-newsroom-electric">
-          Gaming desk
-        </p>
-        <h2 className="mb-4 mt-1 text-xl font-bold tracking-tight text-white">Top 5</h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          {gaming.map((s, i) => (
-            <StoryCard key={s.id} story={s} rank={i + 1} featured={i === 0} />
-          ))}
-          {!gaming.length && (
-            <p className="text-newsroom-muted md:col-span-2">No stories for this date.</p>
-          )}
-        </div>
-      </section>
+      <DeskTop5 label="Movies & TV desk" accent="gold" stories={movies} />
+      <DeskTop5 label="Gaming desk" accent="electric" stories={gaming} />
     </main>
   );
 }
