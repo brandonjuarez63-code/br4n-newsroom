@@ -14,6 +14,7 @@ const parser = new Parser({
     item: [
       ["media:content", "mediaContent", { keepArray: true }],
       ["media:thumbnail", "mediaThumbnail", { keepArray: true }],
+      ["itunes:image", "itunesImage"],
     ],
   },
 });
@@ -49,6 +50,7 @@ function extractImageUrl(item: Parser.Item): string | null {
     enclosure?: { url?: string; type?: string };
     mediaContent?: unknown;
     mediaThumbnail?: unknown;
+    itunesImage?: unknown;
   };
 
   const tryUrl = (raw: unknown): string | null => {
@@ -100,6 +102,14 @@ function extractImageUrl(item: Parser.Item): string | null {
     }
   } else {
     const u = tryUrl(contents);
+    if (u) return u;
+  }
+
+  // itunes:image (podcast-style / some news feeds)
+  const itunes = (extra as { itunesImage?: unknown }).itunesImage
+    ?? (item as Parser.Item & { itunes?: { image?: string } }).itunes?.image;
+  {
+    const u = tryUrl(itunes);
     if (u) return u;
   }
 

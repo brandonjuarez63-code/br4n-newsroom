@@ -57,12 +57,12 @@ function MetaScores({
 }
 
 function StoryActions({
-  detailHref,
+  breakdownHref,
   sourceHref,
   hasPrimary,
   compact,
 }: {
-  detailHref: string | null;
+  breakdownHref: string | null;
   sourceHref: string | null;
   hasPrimary: boolean;
   compact?: boolean;
@@ -76,9 +76,9 @@ function StoryActions({
           : "mt-3.5 border-t border-newsroom-border/50 pt-3"
       )}
     >
-      {detailHref ? (
+      {breakdownHref ? (
         <Link
-          href={detailHref}
+          href={breakdownHref}
           className="text-xs font-medium tracking-wide text-newsroom-gold/90 transition-colors hover:text-newsroom-gold"
         >
           Source Breakdown →
@@ -135,19 +135,56 @@ function PublicationChips({
   );
 }
 
-function FeaturedImage({ src, alt }: { src: string; alt: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
-  return (
+/** Secondary editorial thumb — hides itself on error so parent can fall back to text-only. */
+function StoryThumb({
+  src,
+  href,
+  size,
+  onFail,
+}: {
+  src: string;
+  href: string | null;
+  size: "featured" | "supporting" | "compact";
+  onFail: () => void;
+}) {
+  const box =
+    size === "featured"
+      ? "h-[7.25rem] w-[11.25rem] sm:h-[8.5rem] sm:w-[13.5rem] md:h-[9.5rem] md:w-[15rem]"
+      : size === "supporting"
+        ? "h-[5.75rem] w-[9rem] sm:h-[6.5rem] sm:w-[11rem]"
+        : "h-[3.25rem] w-[4.5rem] sm:h-[3.75rem] sm:w-[5.25rem]";
+
+  const img = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
-      alt={alt}
+      alt=""
       className="h-full w-full object-cover"
       loading="lazy"
       decoding="async"
-      onError={() => setFailed(true)}
+      onError={onFail}
     />
+  );
+
+  return (
+    <div
+      className={cn(
+        "relative shrink-0 overflow-hidden rounded-md bg-newsroom-panel/50 ring-1 ring-newsroom-border/45",
+        box
+      )}
+    >
+      {href ? (
+        <Link
+          href={href}
+          className="block h-full w-full outline-none transition-opacity hover:opacity-90 focus-visible:ring-1 focus-visible:ring-newsroom-gold/50"
+          aria-label="Open story"
+        >
+          {img}
+        </Link>
+      ) : (
+        img
+      )}
+    </div>
   );
 }
 
@@ -171,33 +208,47 @@ export function StoryCard({
     articles.find((a) => a?.id === story?.primary_article_id) || articles[0];
   const sourceHref = safeArticleHref(primary?.url);
   const storyId = story?.id;
-  const detailHref =
+  const storyHref =
     typeof storyId === "number" && Number.isFinite(storyId)
-      ? `/story/${storyId}#source-breakdown`
+      ? `/story/${storyId}`
       : null;
+  const breakdownHref = storyHref ? `${storyHref}#source-breakdown` : null;
   const category = story.category;
 
   const variant: StoryCardVariant =
     variantProp ||
     (featured || rank === 1 ? "featured" : compact ? "compact" : "supporting");
 
-  const imageUrl = variant === "featured" ? pickImageUrl(story) : null;
+  const rawImageUrl = pickImageUrl(story);
+  const [imgFailed, setImgFailed] = useState(false);
+  const imageUrl = rawImageUrl && !imgFailed ? rawImageUrl : null;
+
   const rankLabel =
-    typeof rank === "number"
-      ? String(rank).padStart(2, "0")
-      : null;
+    typeof rank === "number" ? String(rank).padStart(2, "0") : null;
+
+  const headline = story.headline || "information unavailable";
+
+  const Headline = ({ className }: { className: string }) => (
+    <h3 className={className}>
+      {storyHref ? (
+        <Link
+          href={storyHref}
+          className="outline-none transition-colors hover:text-newsroom-gold focus-visible:text-newsroom-gold"
+        >
+          {headline}
+        </Link>
+      ) : (
+        <span>{headline}</span>
+      )}
+    </h3>
+  );
 
   /* ---------- FEATURED (#1) ---------- */
   if (variant === "featured") {
     return (
       <article className="group relative overflow-hidden rounded-xl border border-newsroom-border/60 bg-newsroom-card/70 shadow-card">
-        <div
-          className={cn(
-            "grid gap-0",
-            imageUrl ? "md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]" : ""
-          )}
-        >
-          <div className="flex flex-col p-5 sm:p-6 md:p-7">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:gap-5 sm:p-6 md:gap-6 md:p-7">
+          <div className="min-w-0 flex-1">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {rankLabel && (
                 <span className="font-mono text-xs tabular-nums text-newsroom-gold/80">
@@ -225,18 +276,7 @@ export function StoryCard({
               )}
             </div>
 
-            <h3 className="text-2xl font-semibold leading-[1.2] tracking-tight text-white text-balance sm:text-3xl md:text-[2rem]">
-              {detailHref ? (
-                <Link
-                  href={detailHref}
-                  className="outline-none transition-colors hover:text-newsroom-gold focus-visible:text-newsroom-gold"
-                >
-                  {story.headline || "information unavailable"}
-                </Link>
-              ) : (
-                <span>{story.headline || "information unavailable"}</span>
-              )}
-            </h3>
+            <Headline className="text-2xl font-semibold leading-[1.2] tracking-tight text-white text-balance sm:text-3xl md:text-[2rem]" />
 
             <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-newsroom-muted line-clamp-3 md:line-clamp-4">
               {story.summary || "information unavailable"}
@@ -273,15 +313,20 @@ export function StoryCard({
             </div>
 
             <StoryActions
-              detailHref={detailHref}
+              breakdownHref={breakdownHref}
               sourceHref={sourceHref}
               hasPrimary={Boolean(primary)}
             />
           </div>
 
           {imageUrl ? (
-            <div className="relative hidden min-h-[12rem] border-t border-newsroom-border/40 bg-newsroom-panel/40 md:block md:border-l md:border-t-0">
-              <FeaturedImage src={imageUrl} alt="" />
+            <div className="self-start sm:pt-1">
+              <StoryThumb
+                src={imageUrl}
+                href={storyHref}
+                size="featured"
+                onFail={() => setImgFailed(true)}
+              />
             </div>
           ) : null}
         </div>
@@ -322,18 +367,7 @@ export function StoryCard({
               )}
             </div>
 
-            <h3 className="text-[15px] font-semibold leading-snug tracking-tight text-white/95 text-balance">
-              {detailHref ? (
-                <Link
-                  href={detailHref}
-                  className="outline-none transition-colors hover:text-newsroom-gold focus-visible:text-newsroom-gold"
-                >
-                  {story.headline || "information unavailable"}
-                </Link>
-              ) : (
-                <span>{story.headline || "information unavailable"}</span>
-              )}
-            </h3>
+            <Headline className="text-[15px] font-semibold leading-snug tracking-tight text-white/95 text-balance" />
 
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
               {primary ? (
@@ -357,12 +391,23 @@ export function StoryCard({
             </div>
 
             <StoryActions
-              detailHref={detailHref}
+              breakdownHref={breakdownHref}
               sourceHref={sourceHref}
               hasPrimary={Boolean(primary)}
               compact
             />
           </div>
+
+          {imageUrl ? (
+            <div className="self-start pt-0.5">
+              <StoryThumb
+                src={imageUrl}
+                href={storyHref}
+                size="compact"
+                onFail={() => setImgFailed(true)}
+              />
+            </div>
+          ) : null}
         </div>
       </article>
     );
@@ -371,49 +416,53 @@ export function StoryCard({
   /* ---------- SUPPORTING (#2–#5) ---------- */
   return (
     <article className="group relative flex h-full flex-col rounded-lg border border-newsroom-border/35 bg-newsroom-panel/30 px-4 py-4 transition-colors hover:border-newsroom-border/60 hover:bg-newsroom-card/50 sm:px-5 sm:py-5">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        {rankLabel && (
-          <span className="font-mono text-xs tabular-nums text-newsroom-gold/70">
-            {rankLabel}
-          </span>
-        )}
-        <span
-          className={cn(
-            "rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em]",
-            categoryChip(category)
-          )}
-        >
-          {categoryLabel(category)}
-        </span>
-        <StatusBadge status={story.status} />
-        <MetaScores
-          importance={story.importance}
-          confidence={story.confidence}
-          quiet
-        />
-        {story.is_sample === 1 && (
-          <span className="rounded border border-newsroom-border px-1.5 py-0.5 text-[10px] text-newsroom-muted">
-            SAMPLE
-          </span>
-        )}
+      <div className="flex gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {rankLabel && (
+              <span className="font-mono text-xs tabular-nums text-newsroom-gold/70">
+                {rankLabel}
+              </span>
+            )}
+            <span
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em]",
+                categoryChip(category)
+              )}
+            >
+              {categoryLabel(category)}
+            </span>
+            <StatusBadge status={story.status} />
+            <MetaScores
+              importance={story.importance}
+              confidence={story.confidence}
+              quiet
+            />
+            {story.is_sample === 1 && (
+              <span className="rounded border border-newsroom-border px-1.5 py-0.5 text-[10px] text-newsroom-muted">
+                SAMPLE
+              </span>
+            )}
+          </div>
+
+          <Headline className="text-base font-semibold leading-snug tracking-tight text-white text-balance sm:text-[1.05rem]" />
+
+          <p className="mt-2 text-sm leading-relaxed text-newsroom-muted line-clamp-3">
+            {story.summary || "information unavailable"}
+          </p>
+        </div>
+
+        {imageUrl ? (
+          <div className="self-start">
+            <StoryThumb
+              src={imageUrl}
+              href={storyHref}
+              size="supporting"
+              onFail={() => setImgFailed(true)}
+            />
+          </div>
+        ) : null}
       </div>
-
-      <h3 className="text-base font-semibold leading-snug tracking-tight text-white text-balance sm:text-[1.05rem]">
-        {detailHref ? (
-          <Link
-            href={detailHref}
-            className="outline-none transition-colors hover:text-newsroom-gold focus-visible:text-newsroom-gold"
-          >
-            {story.headline || "information unavailable"}
-          </Link>
-        ) : (
-          <span>{story.headline || "information unavailable"}</span>
-        )}
-      </h3>
-
-      <p className="mt-2 flex-1 text-sm leading-relaxed text-newsroom-muted line-clamp-3">
-        {story.summary || "information unavailable"}
-      </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {publications.length ? (
@@ -438,7 +487,7 @@ export function StoryCard({
       </div>
 
       <StoryActions
-        detailHref={detailHref}
+        breakdownHref={breakdownHref}
         sourceHref={sourceHref}
         hasPrimary={Boolean(primary)}
       />
