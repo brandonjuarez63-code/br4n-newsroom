@@ -1,8 +1,22 @@
 /**
  * Presentation-only story summary synthesis.
  * Does not change ranking, clustering, scores, URLs, or stored story fields.
+ * Prioritizes unique story-specific info; never pads to hit word counts.
  */
 import type { StoryWithArticles } from "@/lib/types";
+import { getDb } from "@/lib/db";
+import {
+  completeSentences as extractCompleteSentences,
+  dedupeUniqueSentences,
+  ensureEndsWithPeriod,
+  extractUniqueFacts,
+  isFillerSentence,
+  isGenericWhyItMatters,
+  relatedStoryContextHints,
+  scrubText,
+  sentencesNearDuplicate,
+  wordCount,
+} from "@/lib/content/uniqueFacts";
 
 export interface SynthesizedSummaries {
   short: string;
@@ -28,66 +42,13 @@ function pubsPhrase(pubs: string[]): string {
   return `${pubs.slice(0, -1).join(", ")}, and ${pubs[pubs.length - 1]}`;
 }
 
-/** Strip HTML leftovers, syndication footers, and normalize whitespace. */
+/** Re-export scrub / sentence split for script + callers. */
 export function scrub(text: string): string {
-  return text
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/\s*The post\s+.+\s+appeared first on\s+.+$/i, "")
-    .replace(/\s*\[?\s*Read more\s*\]?\.?$/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return scrubText(text);
 }
 
-/**
- * Extract complete sentences only. Protects common abbreviations/initials
- * so "Michael J. Fox" does not split early. Drops truncated RSS tails.
- */
 export function completeSentences(text: string, max = 12): string[] {
-  let cleaned = scrub(text)
-    .replace(/\u2026/g, "…")
-    .replace(/\.{3}/g, "…");
-  if (!cleaned) return [];
-
-  // If the whole blob ends with ellipsis and has no prior terminator, treat as incomplete.
-  if (/…\s*$/.test(cleaned) && !/[.!?][^…]*$/.test(cleaned.replace(/…\s*$/, ""))) {
-    // Keep only portions before an earlier .!? if any; else empty.
-    const prior = cleaned.replace(/…\s*$/, "");
-    if (!/[.!?]/.test(prior)) return [];
-    cleaned = prior;
-  }
-
-  // Protect initials / abbreviations from split points.
-  const protectedText = cleaned
-    .replace(/\b([A-Z])\./g, "$1\u0000")
-    .replace(/\b(Mr|Mrs|Ms|Dr|Sr|Jr|St|vs|etc|approx|Dept|No)\./gi, "$1\u0000");
-
-  const parts = protectedText.match(/[^.!?…]+[.!?]+/g) || [];
-  const out: string[] = [];
-  for (const raw of parts) {
-    let s = raw.replace(/\u0000/g, ".").trim();
-    if (!s) continue;
-    if (/…\s*$/.test(s)) continue;
-    if (!/[.!?]$/.test(s)) s = `${s}.`;
-    s = s.replace(/\s+/g, " ").trim();
-    // Drop very short or boilerplate.
-    if (s.length < 20) continue;
-    if (/appeared first on/i.test(s)) continue;
-    out.push(s);
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
-function ensureEndsWithPeriod(s: string): string {
-  const t = s.trim();
-  if (!t) return t;
-  // Already punctuated, including closing quote after the stop.
-  if (/[.!?][)”"'’»]?$/.test(t)) return t;
-  return `${t}.`;
+  return extractCompleteSentences(text, max);
 }
 
 function uncertaintyLine(story: StoryWithArticles): string | null {
@@ -104,51 +65,43 @@ function uncertaintyLine(story: StoryWithArticles): string | null {
   return null;
 }
 
-function articleProseFacts(story: StoryWithArticles): string[] {
-  const lines: string[] = [];
-  const seen = new Set<string>();
-  for (const a of story.articles || []) {
-    for (const s of completeSentences(a.summary || "", 4)) {
-      const key = s.toLowerCase().slice(0, 60);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      lines.push(s);
-    }
+function sentenceAddsInfo(candidate: string, already: string[]): boolean {
+  const c = scrubText(candidate);
+  if (!c || isFillerSentence(c)) return false;
+  for (const prev of already) {
+    if (sentencesNearDuplicate(prev, c)) return false;
   }
-  return lines;
+  return true;
+}
+
+function softenForAttribution(lead: string): string {
+  const first = (lead.match(/^[A-Za-z’']+/) || [""])[0];
+  if (/^(The|A|An|On|In|At|For|After|Before|During|With|As|When|While|And|But)$/.test(first)) {
+    return lead.charAt(0).toLowerCase() + lead.slice(1);
+  }
+  return lead;
+}
+
+function attributeLead(lead: string, pubs: string[], who: string): string {
+  if (/^(according to|reports?\s+say|variety|deadline|the hollywood reporter|thr|ign|polygon|gamespot|eurogamer|thewrap|indiewire|vgc)\b/i.test(lead)) {
+    return lead;
+  }
+  if (!pubs.length) return lead;
+  return `According to ${who}, ${softenForAttribution(lead)}`;
 }
 
 function heuristicShort(story: StoryWithArticles): string {
   const pubs = uniquePubs(story);
   const who = pubsPhrase(pubs);
-  const headline = scrub(trim(story.headline)) || "This developing story";
+  const headline = scrubText(trim(story.headline)) || "This developing story";
   const status = trim(story.status);
-
-  const fromSummary = completeSentences(story.summary || "", 4);
-  const fromArticles = articleProseFacts(story);
-
-  const facts: string[] = [];
-  for (const f of [...fromSummary, ...fromArticles]) {
-    const key = f.toLowerCase().slice(0, 50);
-    if (facts.some((x) => x.toLowerCase().slice(0, 50) === key)) continue;
-    facts.push(f);
-    if (facts.length >= 3) break;
-  }
+  const facts = extractUniqueFacts(story, { max: 6 });
 
   const sentences: string[] = [];
 
   if (facts[0]) {
-    const lead = facts[0];
-    if (/^(according to|reports?\s+say|variety|deadline|the hollywood reporter|thr|ign|polygon|gamespot|eurogamer|thewrap|indiewire|vgc)\b/i.test(lead)) {
-      sentences.push(lead);
-    } else if (pubs.length) {
-      const rest = lead.charAt(0).toLowerCase() + lead.slice(1);
-      sentences.push(`According to ${who}, ${rest}`);
-    } else {
-      sentences.push(lead);
-    }
+    sentences.push(attributeLead(facts[0], pubs, who));
   } else {
-    // No complete RSS sentences — synthesize from headline without inventing details.
     const quoted = headline.replace(/[.“”"']+$/g, "").trim();
     sentences.push(
       pubs.length
@@ -157,21 +110,22 @@ function heuristicShort(story: StoryWithArticles): string {
     );
   }
 
-  if (facts[1]) {
-    sentences.push(facts[1]);
-  } else if (pubs.length > 1 && sentences.length < 2) {
-    sentences.push(`Coverage is coming from ${who}.`);
+  for (const f of facts.slice(1)) {
+    if (sentences.length >= 3) break;
+    if (!sentenceAddsInfo(f, sentences)) continue;
+    sentences.push(f);
   }
 
+  // Only add uncertainty when it adds status signal and we still have room —
+  // never pad with generic "why it matters" templates.
   const uncertain = uncertaintyLine(story);
   if (
     uncertain &&
     (status === "RUMOR" || status === "UNCONFIRMED" || status === "REPORTED") &&
-    sentences.length < 3
+    sentences.length < 3 &&
+    sentenceAddsInfo(uncertain, sentences)
   ) {
     sentences.push(uncertain);
-  } else if (sentences.length < 2 && trim(story.why_it_matters)) {
-    sentences.push(ensureEndsWithPeriod(trim(story.why_it_matters)));
   }
 
   const out = sentences
@@ -187,78 +141,128 @@ function heuristicShort(story: StoryWithArticles): string {
   return out || "Information unavailable for a summary of this story.";
 }
 
+function loadRelatedHints(story: StoryWithArticles): string[] {
+  try {
+    const db = getDb();
+    return relatedStoryContextHints(story, db.stories, { maxSentences: 2 });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Expanded summary: what happened; important details; who/what; current context;
+ * historical/related context ONLY from local data; unknowns when applicable.
+ * Stops when unique facts are exhausted — never pads to a word target.
+ */
 function heuristicLong(story: StoryWithArticles): string {
   const pubs = uniquePubs(story);
   const who = pubsPhrase(pubs);
+  const facts = extractUniqueFacts(story, { max: 14 });
+  const used: string[] = [];
   const paragraphs: string[] = [];
 
-  const short = heuristicShort(story);
-  paragraphs.push(short);
-
-  const moreFacts = completeSentences(story.summary || "", 8);
-  const articleFacts = articleProseFacts(story);
-  const used = new Set(
-    short
-      .toLowerCase()
-      .split(/[.!?]/)
-      .map((s) => s.trim().slice(0, 50))
-      .filter(Boolean)
-  );
-
-  const extra: string[] = [];
-  for (const s of [...moreFacts, ...articleFacts]) {
-    const key = s.toLowerCase().slice(0, 50);
-    if (used.has(key)) continue;
-    used.add(key);
-    extra.push(s);
-    if (extra.length >= 10) break;
+  // 1) What happened (+ attribution)
+  const leadBits: string[] = [];
+  if (facts[0]) {
+    const lead = attributeLead(facts[0], pubs, who);
+    leadBits.push(lead);
+    used.push(facts[0], lead);
+  } else {
+    leadBits.push(heuristicShort(story));
+    used.push(...completeSentences(leadBits[0], 4));
   }
 
-  if (extra.length) {
-    paragraphs.push(extra.join(" "));
+  // 2) Important unique details (stop when exhausted)
+  const detailBits: string[] = [];
+  for (const f of facts.slice(1)) {
+    if (!sentenceAddsInfo(f, [...used, ...detailBits])) continue;
+    detailBits.push(f);
+    // Thin stories: keep expansion short; rich multi-source can take more.
+    const cap = Math.max(2, Math.min(8, facts.length));
+    if (detailBits.length >= cap) break;
   }
 
+  if (leadBits.length) {
+    paragraphs.push(
+      leadBits
+        .concat(detailBits.slice(0, 2))
+        .map((s) => ensureEndsWithPeriod(s))
+        .join(" ")
+    );
+    used.push(...detailBits.slice(0, 2));
+  }
+
+  // Remaining unique details as a second paragraph when warranted
+  const more = detailBits.slice(2).filter((f) => sentenceAddsInfo(f, used));
+  if (more.length) {
+    paragraphs.push(more.map((s) => ensureEndsWithPeriod(s)).join(" "));
+    used.push(...more);
+  }
+
+  // 3) Non-generic why / current context (skip ranking filler templates)
   const why = trim(story.why_it_matters);
-  if (why && !short.toLowerCase().includes(why.slice(0, Math.min(40, why.length)).toLowerCase())) {
-    paragraphs.push(ensureEndsWithPeriod(why));
+  if (why && !isGenericWhyItMatters(why)) {
+    for (const s of completeSentences(why, 2)) {
+      if (sentenceAddsInfo(s, used)) {
+        paragraphs.push(ensureEndsWithPeriod(s));
+        used.push(s);
+      }
+    }
   }
 
-  const know = trim(story.what_we_know);
-  if (know && !/^Covered by /i.test(know)) {
-    const knowSentences = completeSentences(know, 4);
-    if (knowSentences.length) paragraphs.push(knowSentences.join(" "));
+  // 4) Historical / related context from local DB peers only
+  const related = loadRelatedHints(story).filter((s) => sentenceAddsInfo(s, used));
+  if (related.length) {
+    const cleaned = dedupeUniqueSentences(related, { max: 2 });
+    if (cleaned.length) {
+      paragraphs.push(cleaned.map((s) => ensureEndsWithPeriod(s)).join(" "));
+      used.push(...cleaned);
+    }
   }
 
+  // 5) Unknowns — prefer story field when substantive; else status line once
   const dont = trim(story.what_we_dont_know);
   const uncertain = uncertaintyLine(story);
-  if (dont && !/^Covered by /i.test(dont)) {
-    paragraphs.push(ensureEndsWithPeriod(dont));
-  } else if (uncertain && !short.includes(uncertain.slice(0, 30))) {
-    paragraphs.push(uncertain);
-  }
-
-  if (pubs.length) {
-    paragraphs.push(
-      `Source coverage currently includes ${who}. See Source Breakdown below for links and outlet details.`
+  if (dont && !/^Covered by /i.test(dont) && !isFillerSentence(dont)) {
+    const dontSentences = completeSentences(dont, 3).filter((s) =>
+      sentenceAddsInfo(s, used)
     );
+    if (dontSentences.length) {
+      paragraphs.push(dontSentences.map((s) => ensureEndsWithPeriod(s)).join(" "));
+      used.push(...dontSentences);
+    } else if (sentenceAddsInfo(dont, used)) {
+      paragraphs.push(ensureEndsWithPeriod(dont));
+      used.push(dont);
+    }
+  } else if (
+    uncertain &&
+    (story.status === "RUMOR" ||
+      story.status === "UNCONFIRMED" ||
+      (story.status === "REPORTED" && story.official_confirmed !== 1)) &&
+    sentenceAddsInfo(uncertain, used)
+  ) {
+    // Only add when status actually warrants it — skip for HIGH CONFIDENCE / CONFIRMED.
+    paragraphs.push(uncertain);
+    used.push(uncertain);
   }
 
-  // Target ~250–400 words when enough material; otherwise stay shorter — no padding/invention.
+  // Soft hard-cap only to avoid runaway; never pad upward.
   let long = paragraphs.join("\n\n").replace(/[…]+/g, ".").replace(/\.{3,}/g, ".");
-  const words = long.split(/\s+/).filter(Boolean);
-  if (words.length > 420) {
+  if (wordCount(long) > 420) {
     let count = 0;
     const kept: string[] = [];
     for (const sent of completeSentences(long.replace(/\n+/g, " "), 40)) {
       const w = sent.trim().split(/\s+/).length;
-      if (count + w > 400 && kept.length >= 4) break;
+      if (count + w > 400 && kept.length >= 3) break;
+      if (!sentenceAddsInfo(sent, kept) && kept.length) continue;
       kept.push(sent.trim());
       count += w;
     }
     long = kept.join(" ");
   }
 
-  return long || short;
+  return long || heuristicShort(story);
 }
 
 function templateSynthesize(story: StoryWithArticles): SynthesizedSummaries {
@@ -275,37 +279,45 @@ async function openAiSynthesize(
   apiKey: string
 ): Promise<SynthesizedSummaries> {
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const uniqueFacts = extractUniqueFacts(story, { max: 14 });
+  const related = loadRelatedHints(story).filter((s) =>
+    sentenceAddsInfo(s, uniqueFacts)
+  );
   const payload = {
     headline: story.headline,
     status: story.status,
     official_confirmed: story.official_confirmed === 1,
-    summary: story.summary,
-    why_it_matters: story.why_it_matters,
-    what_we_know: story.what_we_know,
+    unique_facts: uniqueFacts,
+    related_local_context: related,
+    why_it_matters: isGenericWhyItMatters(story.why_it_matters || "")
+      ? null
+      : story.why_it_matters,
     what_we_dont_know: story.what_we_dont_know,
     publications: uniquePubs(story),
-    articles: (story.articles || []).map((a) => ({
-      publication: a.source_name,
-      title: a.title,
-      summary: a.summary,
-    })),
   };
 
   const prompt = `Synthesize two summaries for an entertainment newsroom story page from ONLY the JSON facts below.
 
 Return strict JSON: {"short":"...","long":"..."}
 
+Hard anti-repetition / anti-padding rules:
+- Prioritize UNIQUE useful story-specific information over length. Never pad to hit a word count.
+- Before adding any sentence: does it give information not already given? If no, omit it.
+- Never restate the same fact with different wording (e.g. do not say a first Emmy win three ways).
+- Never invent trivia. Never use generic filler ("awards-season narratives", "career momentum", "significant for the industry", "fans will be watching", "relevant to entertainment audiences", etc.).
+- Multi-source: synthesize unique bits into one coherent piece — never concatenate per-source restatements.
+- If material is thin, keep the long summary short. Expand only when unique facts warrant it.
+- related_local_context is optional historical/peer context from the same newsroom DB — use ONLY if genuinely helpful and not duplicative; otherwise omit.
+
 short:
 - Exactly 2 or 3 complete sentences (never truncated with "..." or "…").
 - Answer what happened, who/what is involved, and the main news.
-- Rewrite cut-off RSS blurbs into complete sentences; do not leave dangling fragments.
 - Do not invent facts.
 
 long:
-- About 250–400 words WHEN there is enough reliable material; shorter is fine if material is thin.
-- Pure synthesis: do not dump copyrighted article text, do not invent facts/quotes/dates.
-- Note uncertainty or disagreement when status is RUMOR/UNCONFIRMED/REPORTED without official confirmation.
-- Natural prose paragraphs, no section headings, no bullet lists, no scores.
+- Structure when info exists: what happened; important details; who/what involved; relevant current context; historical/previous context ONLY if provided in related_local_context and helpful; unknowns when applicable.
+- Pure synthesis from unique_facts. No section headings, bullets, or scores.
+- Note uncertainty when status is RUMOR/UNCONFIRMED/REPORTED without official confirmation — once, not repeatedly.
 
 Facts:
 ${JSON.stringify(payload)}`;
@@ -318,13 +330,13 @@ ${JSON.stringify(payload)}`;
     },
     body: JSON.stringify({
       model,
-      temperature: 0.3,
+      temperature: 0.25,
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
           content:
-            "You synthesize careful newsroom summaries. Never invent facts. Always complete sentences. Return JSON only.",
+            "You synthesize careful newsroom summaries. Never invent facts. Never repeat the same fact. Never pad with filler. Always complete sentences. Return JSON only.",
         },
         { role: "user", content: prompt },
       ],
@@ -337,11 +349,10 @@ ${JSON.stringify(payload)}`;
   const text = data.choices?.[0]?.message?.content?.trim();
   if (!text) throw new Error("empty openai");
   const parsed = JSON.parse(text) as { short?: string; long?: string };
-  const short = scrub(parsed.short || "")
+  const short = scrubText(parsed.short || "")
     .replace(/[…]+$/g, "")
     .replace(/\.{3,}$/g, "");
-  // Preserve paragraph breaks in long form.
-  const long = (parsed.long || "")
+  let long = (parsed.long || "")
     .replace(/<[^>]+>/g, " ")
     .replace(/[…]+/g, ".")
     .trim();
@@ -349,9 +360,32 @@ ${JSON.stringify(payload)}`;
   if (/…\s*$/.test(short) || /\.\.\.\s*$/.test(short)) {
     return { ...fallback, engine: "template-fallback" };
   }
+
+  // Post-filter: drop filler / near-dup sentences the model may still emit.
+  const longParas = long.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  const cleanedParas: string[] = [];
+  const seen: string[] = [];
+  for (const para of longParas) {
+    const kept = dedupeUniqueSentences(
+      completeSentences(para, 20).filter((s) => sentenceAddsInfo(s, seen)),
+      { max: 12 }
+    );
+    if (!kept.length) continue;
+    cleanedParas.push(kept.map((s) => ensureEndsWithPeriod(s)).join(" "));
+    seen.push(...kept);
+  }
+  if (cleanedParas.length) long = cleanedParas.join("\n\n");
+
+  const shortClean = dedupeUniqueSentences(completeSentences(short, 6), {
+    max: 3,
+  });
+  const shortOut = shortClean.length
+    ? shortClean.map((s) => ensureEndsWithPeriod(s)).join(" ")
+    : ensureEndsWithPeriod(short);
+
   return {
-    short: ensureEndsWithPeriod(short),
-    long,
+    short: shortOut,
+    long: long || fallback.long,
     engine: "openai",
   };
 }
