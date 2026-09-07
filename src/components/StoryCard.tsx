@@ -126,7 +126,7 @@ function PublicationChips({
   );
 }
 
-/** Editorial thumb — hides itself on error so parent falls back to text-only. */
+/** Editorial thumb — float-right for featured/supporting; compact stays a side thumb. */
 function StoryThumb({
   src,
   href,
@@ -140,9 +140,10 @@ function StoryThumb({
 }) {
   const box =
     size === "featured"
-      ? "aspect-[16/10] w-full sm:aspect-auto sm:h-[15rem] sm:w-[23rem] md:h-[17rem] md:w-[26.5rem] lg:h-[18.5rem] lg:w-[29rem]"
+      ? // Mobile: full-width block; sm+: fixed float-right so text wraps underneath
+        "mb-3 w-full float-none sm:float-right sm:mb-3 sm:ml-5 sm:h-[14rem] sm:w-[21.5rem] md:h-[16rem] md:w-[24.5rem] lg:h-[17.5rem] lg:w-[27rem] aspect-[16/10] sm:aspect-auto"
       : size === "supporting"
-        ? "h-[7rem] w-[11.25rem] sm:h-[8.25rem] sm:w-[13.5rem] md:h-[8.75rem] md:w-[15.25rem]"
+        ? "float-right mb-2.5 ml-3.5 h-[5.75rem] w-[9.5rem] sm:mb-3 sm:ml-4 sm:h-[7rem] sm:w-[11.5rem] md:h-[7.75rem] md:w-[13rem]"
         : "h-[3.25rem] w-[4.5rem] sm:h-[3.75rem] sm:w-[5.25rem]";
 
   const img = (
@@ -160,8 +161,9 @@ function StoryThumb({
   return (
     <div
       className={cn(
-        "relative shrink-0 overflow-hidden bg-newsroom-panel/40",
+        "relative overflow-hidden bg-newsroom-panel/40",
         size === "featured" ? "rounded-md" : "rounded",
+        size === "compact" ? "shrink-0" : "",
         box
       )}
     >
@@ -235,99 +237,94 @@ export function StoryCard({
     </h3>
   );
 
-  /* ---------- FEATURED (#1 Top Story) ---------- */
+  /* ---------- FEATURED (#1 Top Story) — editorial float, not two-col ---------- */
   if (variant === "featured") {
     return (
       <article className="group relative">
-        <div
-          className={cn(
-            "flex flex-col gap-5 sm:gap-6",
-            imageUrl ? "lg:flex-row lg:items-start lg:gap-9" : ""
+        <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          {rankLabel && (
+            <span className="font-mono text-sm tabular-nums text-newsroom-gold">
+              #{rank === 1 ? "1" : rankLabel}
+            </span>
           )}
-        >
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-newsroom-gold/90">
+            Top Story
+          </span>
+          <span
+            className={cn(
+              "rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em]",
+              categoryChip(category)
+            )}
+          >
+            {categoryLabel(category)}
+          </span>
+          <StatusBadge status={story.status} />
+          <MetaScores
+            importance={story.importance}
+            confidence={story.confidence}
+          />
+          {story.is_sample === 1 && (
+            <span className="rounded border border-newsroom-border/70 px-1.5 py-0.5 text-[10px] text-newsroom-muted">
+              SAMPLE
+            </span>
+          )}
+        </div>
+
+        {/* Float body: image upper-right; text wraps full-width under it */}
+        <div>
           {imageUrl ? (
-            <div className="order-first w-full shrink-0 sm:w-auto lg:order-last">
-              <StoryThumb
-                src={imageUrl}
-                href={storyHref}
-                size="featured"
-                onFail={() => setImgFailed(true)}
-              />
-            </div>
+            <StoryThumb
+              src={imageUrl}
+              href={storyHref}
+              size="featured"
+              onFail={() => setImgFailed(true)}
+            />
           ) : null}
 
-          <div className="min-w-0 flex-1">
-            <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-              {rankLabel && (
-                <span className="font-mono text-sm tabular-nums text-newsroom-gold">
-                  #{rank === 1 ? "1" : rankLabel}
-                </span>
-              )}
-              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-newsroom-gold/90">
-                Top Story
-              </span>
-              <span
-                className={cn(
-                  "rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em]",
-                  categoryChip(category)
-                )}
-              >
-                {categoryLabel(category)}
-              </span>
-              <StatusBadge status={story.status} />
-              <MetaScores
-                importance={story.importance}
-                confidence={story.confidence}
+          <Headline className="text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-white text-balance sm:text-[2rem] md:text-[2.28rem]" />
+
+          <p className="mt-4 text-[15px] leading-relaxed text-newsroom-muted line-clamp-4 md:line-clamp-5">
+            {story.summary || "information unavailable"}
+          </p>
+
+          <p className="mt-3 text-sm leading-relaxed text-newsroom-muted/85">
+            <span className="font-medium text-white/65">Why it matters</span>
+            <span className="mx-1.5 text-newsroom-border">—</span>
+            {story.why_it_matters || "information unavailable"}
+          </p>
+        </div>
+
+        {/* Clear so meta/actions sit full-width below the float */}
+        <div className="clear-both">
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+            {publications.length ? (
+              <PublicationChips
+                publications={publications}
+                articles={articles}
+                limit={5}
               />
-              {story.is_sample === 1 && (
-                <span className="rounded border border-newsroom-border/70 px-1.5 py-0.5 text-[10px] text-newsroom-muted">
-                  SAMPLE
-                </span>
-              )}
-            </div>
-
-            <Headline className="text-[1.75rem] font-semibold leading-[1.15] tracking-tight text-white text-balance sm:text-[2rem] md:text-[2.28rem]" />
-
-            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-newsroom-muted line-clamp-4 md:line-clamp-5">
-              {story.summary || "information unavailable"}
-            </p>
-
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-newsroom-muted/85">
-              <span className="font-medium text-white/65">Why it matters</span>
-              <span className="mx-1.5 text-newsroom-border">—</span>
-              {story.why_it_matters || "information unavailable"}
-            </p>
-
-            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-              {publications.length ? (
-                <PublicationChips
-                  publications={publications}
-                  articles={articles}
-                  limit={5}
-                />
-              ) : primary ? (
-                <SourceRow
-                  publication={primary.source_name}
-                  author={primary.author}
-                  date={formatWhen(primary.published_at || story.updated_at)}
-                  url={primary.url}
-                />
-              ) : (
-                <span className="text-[11px] text-newsroom-muted">
-                  information unavailable
-                </span>
-              )}
-              <span className="text-[11px] text-newsroom-muted/55">
-                Updated {formatWhen(story.updated_at)}
+            ) : primary ? (
+              <SourceRow
+                publication={primary.source_name}
+                author={primary.author}
+                date={formatWhen(primary.published_at || story.updated_at)}
+                url={primary.url}
+              />
+            ) : (
+              <span className="text-[11px] text-newsroom-muted">
+                information unavailable
               </span>
-            </div>
-
-            <StoryActions
-              breakdownHref={breakdownHref}
-              sourceHref={sourceHref}
-              hasPrimary={Boolean(primary)}
-            />
+            )}
+            <span className="text-[11px] text-newsroom-muted/55">
+              Updated {formatWhen(story.updated_at)}
+            </span>
           </div>
+
+          <StoryActions
+            breakdownHref={breakdownHref}
+            sourceHref={sourceHref}
+            hasPrimary={Boolean(primary)}
+          />
         </div>
       </article>
     );
@@ -411,28 +408,17 @@ export function StoryCard({
     );
   }
 
-  /* ---------- SUPPORTING (#2–#5) — compact editorial rows, not #1 clones ---------- */
+  /* ---------- SUPPORTING (#2–#5) — float-right editorial wrap ---------- */
   return (
-    <article className="group relative flex h-full flex-col py-3.5 sm:py-4">
-      <div className="flex h-full gap-3.5 sm:gap-4 md:gap-5">
+    <article className="group relative py-3.5 sm:py-4">
+      <div className="flex gap-3 sm:gap-3.5">
         {rankLabel && (
           <span className="mt-0.5 w-7 shrink-0 font-mono text-xs tabular-nums text-newsroom-gold/65">
             {rankLabel}
           </span>
         )}
 
-        {imageUrl ? (
-          <div className="self-start">
-            <StoryThumb
-              src={imageUrl}
-              href={storyHref}
-              size="supporting"
-              onFail={() => setImgFailed(true)}
-            />
-          </div>
-        ) : null}
-
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
             <span
               className={cn(
@@ -454,13 +440,25 @@ export function StoryCard({
             )}
           </div>
 
-          <Headline className="text-[1.05rem] font-semibold leading-snug tracking-tight text-white text-balance sm:text-lg" />
+          {/* Float body: image upper-right; headline/summary wrap underneath */}
+          <div>
+            {imageUrl ? (
+              <StoryThumb
+                src={imageUrl}
+                href={storyHref}
+                size="supporting"
+                onFail={() => setImgFailed(true)}
+              />
+            ) : null}
 
-          <p className="mt-1.5 text-sm leading-relaxed text-newsroom-muted line-clamp-2">
-            {story.summary || "information unavailable"}
-          </p>
+            <Headline className="text-[1.05rem] font-semibold leading-snug tracking-tight text-white text-balance sm:text-lg" />
 
-          <div className="mt-auto pt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <p className="mt-1.5 text-sm leading-relaxed text-newsroom-muted line-clamp-2 sm:line-clamp-3">
+              {story.summary || "information unavailable"}
+            </p>
+          </div>
+
+          <div className="clear-both mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {publications.length ? (
               <PublicationChips
                 publications={publications}
