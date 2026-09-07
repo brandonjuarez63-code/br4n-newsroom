@@ -2,16 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoryByIdAsync } from "@/lib/db";
 import { StatusBadge } from "@/components/StatusBadge";
+import { StorySummary } from "@/components/StorySummary";
 import { formatWhen, safeArticleHref } from "@/lib/utils";
 import {
   confidenceScoreLine,
   importanceScoreLine,
-  plainWhatWeDontKnow,
-  plainWhatWeKnow,
   plainWhyConfidence,
   plainWhyImportance,
   scoringDetailLines,
 } from "@/lib/storyPresentation";
+import { synthesizeStorySummaries } from "@/lib/summary/synthesize";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,7 @@ export default async function StoryPage({
   const articles = Array.isArray(story.articles) ? story.articles : [];
   const importanceDetails = scoringDetailLines(story.why_importance);
   const confidenceDetails = scoringDetailLines(story.why_confidence);
+  const summaries = await synthesizeStorySummaries(story);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -63,33 +64,10 @@ export default async function StoryPage({
       </p>
 
       <section className="mt-6 space-y-6 rounded-xl border border-newsroom-border bg-newsroom-card p-5">
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
-            Summary
-          </h2>
-          <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
-            {textOrUnavailable(story.summary)}
-          </p>
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-electric">
-              What we know
-            </h2>
-            <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
-              {plainWhatWeKnow(story)}
-            </p>
-          </div>
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-muted">
-              What we don&apos;t know
-            </h2>
-            <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
-              {plainWhatWeDontKnow(story)}
-            </p>
-          </div>
-        </div>
+        <StorySummary
+          shortSummary={summaries.short}
+          longSummary={summaries.long}
+        />
 
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
