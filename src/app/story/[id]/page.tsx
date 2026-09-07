@@ -3,7 +3,15 @@ import { notFound } from "next/navigation";
 import { getStoryByIdAsync } from "@/lib/db";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatWhen, safeArticleHref } from "@/lib/utils";
-import type { StoryWithArticles } from "@/lib/types";
+import {
+  highlyReliableSourceCount,
+  highestReliability,
+  independentReputableCount,
+  plainWhatWeDontKnow,
+  plainWhatWeKnow,
+  plainWhyImportance,
+  scoringDetailLines,
+} from "@/lib/storyPresentation";
 
 export const dynamic = "force-dynamic";
 
@@ -12,34 +20,6 @@ const UNAVAILABLE = "information unavailable";
 function textOrUnavailable(value: string | null | undefined): string {
   const t = (value ?? "").trim();
   return t ? t : UNAVAILABLE;
-}
-
-/** Count independent reputable outlets from stored article/source fields only. */
-function independentReputableCount(story: StoryWithArticles): number | null {
-  const articles = Array.isArray(story.articles) ? story.articles : [];
-  if (!articles.length) return null;
-  const ids = new Set<number>();
-  for (const a of articles) {
-    const rel = a.source_reliability;
-    const type = a.source_type;
-    const reputable =
-      (typeof rel === "number" && rel >= 80) ||
-      type === "industry" ||
-      type === "official";
-    if (reputable && typeof a.source_id === "number") ids.add(a.source_id);
-  }
-  return ids.size;
-}
-
-/** Split stored why_confidence into factor lines — no new scoring. */
-function confidenceFactorLines(why: string | null | undefined): string[] {
-  const raw = (why ?? "").trim();
-  if (!raw) return [];
-  return raw
-    .replace(/\.$/, "")
-    .split(";")
-    .map((s) => s.trim())
-    .filter(Boolean);
 }
 
 export default async function StoryPage({
@@ -55,9 +35,17 @@ export default async function StoryPage({
   if (!story || story.id !== numericId) notFound();
 
   const articles = Array.isArray(story.articles) ? story.articles : [];
-  const pubs = Array.isArray(story.publications) ? story.publications : [];
   const indieCount = independentReputableCount(story);
-  const confFactors = confidenceFactorLines(story.why_confidence);
+  const bestRel = highestReliability(story);
+  const highRelCount = highlyReliableSourceCount(story);
+  const importanceDetails = scoringDetailLines(story.why_importance);
+  const confidenceDetails = scoringDetailLines(story.why_confidence);
+  const officialYesNo =
+    story.official_confirmed === 1
+      ? "Yes"
+      : story.official_confirmed === 0
+        ? "No"
+        : UNAVAILABLE;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -79,94 +67,126 @@ export default async function StoryPage({
         {textOrUnavailable(story.headline)}
       </h1>
       <p className="mt-2 text-sm text-newsroom-muted">
-        Importance {story.importance ?? UNAVAILABLE} · Confidence{" "}
-        {story.confidence ?? UNAVAILABLE} · Status {story.status || UNAVAILABLE} ·
-        Updated {formatWhen(story.updated_at)}
+        Importance {story.importance ?? UNAVAILABLE}/100 · Confidence{" "}
+        {story.confidence ?? UNAVAILABLE}/100 · {story.status || UNAVAILABLE}
       </p>
 
-      <section className="mt-6 space-y-4 rounded-xl border border-newsroom-border bg-newsroom-card p-5">
+      <section className="mt-6 space-y-5 rounded-xl border border-newsroom-border bg-newsroom-card p-5">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
             Summary
           </h2>
-          <p className="mt-1 text-sm text-newsroom-muted">
+          <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
             {textOrUnavailable(story.summary)}
           </p>
         </div>
+
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
             Why it matters
           </h2>
-          <p className="mt-1 text-sm">{textOrUnavailable(story.why_it_matters)}</p>
+          <p className="mt-1 text-sm leading-relaxed">
+            {textOrUnavailable(story.why_it_matters)}
+          </p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+
+        <div className="grid gap-5 md:grid-cols-2">
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-electric">
               What we know
             </h2>
-            <p className="mt-1 text-sm text-newsroom-muted">
-              {textOrUnavailable(story.what_we_know)}
+            <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
+              {plainWhatWeKnow(story)}
             </p>
           </div>
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-muted">
               What we don&apos;t know
             </h2>
-            <p className="mt-1 text-sm text-newsroom-muted">
-              {textOrUnavailable(story.what_we_dont_know)}
+            <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
+              {plainWhatWeDontKnow(story)}
             </p>
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
-              Why importance
-            </h2>
-            <p className="mt-1 text-sm text-newsroom-muted">
-              {textOrUnavailable(story.why_importance)}
-            </p>
-          </div>
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
-              Why confidence / status
-            </h2>
-            <p className="mt-1 text-sm text-newsroom-muted">
-              {textOrUnavailable(story.why_confidence)}
-            </p>
-            <p className="mt-1 text-xs text-newsroom-muted">
-              Status label: {story.status || UNAVAILABLE}
-            </p>
-          </div>
+
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
+            Why importance
+          </h2>
+          <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
+            {plainWhyImportance(story)}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-4 text-xs text-newsroom-muted">
-          <span>
-            Official confirmation:{" "}
-            {story.official_confirmed === 1
-              ? "Yes"
-              : story.official_confirmed === 0
-                ? "No"
+
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
+            Why confidence / status
+          </h2>
+          <ul className="mt-2 space-y-1.5 text-sm text-newsroom-muted">
+            <li>
+              <span className="text-white/80">Independent reputable outlets:</span>{" "}
+              {indieCount == null ? UNAVAILABLE : indieCount}
+            </li>
+            <li>
+              <span className="text-white/80">Highest source reliability:</span>{" "}
+              {bestRel == null ? UNAVAILABLE : `${bestRel}/100`}
+            </li>
+            <li>
+              <span className="text-white/80">Highly reliable sources (≥85):</span>{" "}
+              {highRelCount == null ? UNAVAILABLE : highRelCount}
+            </li>
+            <li>
+              <span className="text-white/80">Official confirmation:</span>{" "}
+              {officialYesNo}
+            </li>
+            <li>
+              <span className="text-white/80">Confidence:</span>{" "}
+              {typeof story.confidence === "number"
+                ? `${story.confidence}/100`
                 : UNAVAILABLE}
-          </span>
-          <span>
-            Independent reputable outlets:{" "}
-            {indieCount == null ? UNAVAILABLE : indieCount}
-          </span>
-          <span>
-            Publications: {pubs.length ? pubs.join(", ") : UNAVAILABLE}
-          </span>
+            </li>
+            <li>
+              <span className="text-white/80">Status:</span>{" "}
+              {story.status || UNAVAILABLE}
+            </li>
+          </ul>
         </div>
-        {confFactors.length > 0 && (
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
-              Confidence factors / penalties
-            </h2>
-            <ul className="mt-1 list-inside list-disc text-sm text-newsroom-muted">
-              {confFactors.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
+
+        <details className="rounded-lg border border-newsroom-border bg-newsroom-panel p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-newsroom-gold">
+            Show scoring details
+          </summary>
+          <div className="mt-3 space-y-3 text-xs text-newsroom-muted">
+            <div>
+              <p className="font-semibold text-white/70">Importance factors</p>
+              {importanceDetails.length ? (
+                <ul className="mt-1 list-inside list-disc">
+                  {importanceDetails.map((line) => (
+                    <li key={`imp-${line}`}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1">{UNAVAILABLE}</p>
+              )}
+            </div>
+            <div>
+              <p className="font-semibold text-white/70">Confidence factors / penalties</p>
+              {confidenceDetails.length ? (
+                <ul className="mt-1 list-inside list-disc">
+                  {confidenceDetails.map((line) => (
+                    <li key={`conf-${line}`}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1">{UNAVAILABLE}</p>
+              )}
+            </div>
+            <p className="text-[11px] opacity-70">
+              Stored technical strings are for transparency only. Scores themselves are
+              unchanged.
+            </p>
           </div>
-        )}
+        </details>
       </section>
 
       <section id="source-breakdown" className="mt-6">
@@ -187,7 +207,7 @@ export default async function StoryPage({
                   : "Author not listed";
               const reliability =
                 typeof a?.source_reliability === "number"
-                  ? a.source_reliability
+                  ? `${a.source_reliability}/100`
                   : UNAVAILABLE;
               const sourceType = a?.source_type || UNAVAILABLE;
               const title = textOrUnavailable(a?.title);
