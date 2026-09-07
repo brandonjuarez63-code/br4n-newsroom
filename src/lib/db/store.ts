@@ -110,12 +110,23 @@ async function findBlobUrl(token: string): Promise<string | null> {
       }
     );
     if (!res.ok) return null;
-    const data = (await res.json()) as { blobs?: { pathname: string; url: string }[] };
-    const hit =
-      data.blobs?.find((b) => b.pathname === BLOB_PATHNAME) ||
-      data.blobs?.find((b) => b.pathname.endsWith("newsroom.json")) ||
-      data.blobs?.[0];
-    return hit?.url || null;
+    const data = (await res.json()) as {
+      blobs?: { pathname: string; url: string; uploadedAt?: string; size?: number }[];
+    };
+    const blobs = data.blobs || [];
+    // Overwrite writes can leave multiple pathname versions; always take newest
+    // so article image_url metadata from the latest refresh is what the UI reads.
+    const candidates = blobs.filter(
+      (b) => b.pathname === BLOB_PATHNAME || b.pathname.endsWith("newsroom.json")
+    );
+    const pool = candidates.length ? candidates : blobs;
+    pool.sort((a, b) => {
+      const ta = String(a.uploadedAt || "");
+      const tb = String(b.uploadedAt || "");
+      if (ta !== tb) return tb.localeCompare(ta);
+      return (b.size || 0) - (a.size || 0);
+    });
+    return pool[0]?.url || null;
   } catch {
     return null;
   }
