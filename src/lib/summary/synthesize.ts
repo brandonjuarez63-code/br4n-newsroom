@@ -85,7 +85,8 @@ export function completeSentences(text: string, max = 12): string[] {
 function ensureEndsWithPeriod(s: string): string {
   const t = s.trim();
   if (!t) return t;
-  if (/[.!?]$/.test(t)) return t;
+  // Already punctuated, including closing quote after the stop.
+  if (/[.!?][)”"'’»]?$/.test(t)) return t;
   return `${t}.`;
 }
 
