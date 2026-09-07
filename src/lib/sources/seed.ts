@@ -117,7 +117,7 @@ export const SAMPLE_BUNDLE: SampleItem[] = [
     sourceName: "IndieWire",
     category: "movies_tv",
     title: "Director Attached To Reboot Of Classic Sci-Fi Property (Sample)",
-    url: "https://www.empireonline.com/sample/scifi-reboot",
+    url: "https://www.indiewire.com/sample/scifi-reboot",
     author: "Author not listed",
     published_at: recent(20),
     summary: "Sample story: a noted director is attached to reboot a classic sci-fi property.",

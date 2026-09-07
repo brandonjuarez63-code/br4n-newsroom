@@ -1,4 +1,5 @@
 import type { Category, StoryWithArticles } from "@/lib/types";
+import { isClickableArticleUrl } from "@/lib/sources/articleUrl";
 
 function categoryLabel(cat: Category): string {
   return cat === "movies_tv" ? "movie and TV" : "gaming";
@@ -57,6 +58,7 @@ export function generateTemplateScript(
     lines.push("");
 
     for (const a of story.articles) {
+      if (!isClickableArticleUrl(a.url)) continue;
       sources.push({
         title: a.title,
         url: a.url,

@@ -54,6 +54,7 @@ export function NewsroomDashboard({ initialCategory }: { initialCategory: Catego
       const r = json.results?.[0];
       const errN = Array.isArray(r?.errors) ? r.errors.length : 0;
       const skipN = r?.skipped_irrelevant || 0;
+      const badUrlN = r?.skipped_bad_url || 0;
       setMessage(
         r
           ? `Refresh done: ${r.article_count} articles → ${r.story_count} stories${

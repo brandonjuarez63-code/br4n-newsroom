@@ -2,6 +2,7 @@ import Parser from "rss-parser";
 import type { Article, Category, Source } from "@/lib/types";
 import { markSourceUnavailable } from "@/lib/db";
 import { isRelevantToCategory } from "@/lib/sources/relevance";
+import { mapPool, pickArticleUrl, validateAndCanonicalizeUrl } from "@/lib/sources/articleUrl";
 
 const parser = new Parser({
   timeout: 12000,
@@ -101,21 +102,42 @@ export interface FetchResult {
   articles: Omit<Article, "id">[];
   errors: { source: string; error: string }[];
   skipped_irrelevant: number;
+  skipped_bad_url: number;
 }
 
 export async function fetchSourceFeed(
   source: Source
-): Promise<{ articles: Omit<Article, "id">[]; error?: string; skipped?: number }> {
+): Promise<{
+  articles: Omit<Article, "id">[];
+  error?: string;
+  skipped?: number;
+  skipped_bad_url?: number;
+}> {
   try {
     const feed = await parser.parseURL(source.feed_url);
     markSourceUnavailable(source.id, false);
     const now = new Date().toISOString();
-    const articles: Omit<Article, "id">[] = [];
+    const pending: Omit<Article, "id">[] = [];
     let skipped = 0;
+    let skipped_bad_url = 0;
+
     for (const item of feed.items.slice(0, 25)) {
       const title = (item.title || "").trim();
-      const url = (item.link || item.guid || "").trim();
-      if (!title || !url) continue;
+      if (!title) continue;
+
+      const url = pickArticleUrl(
+        {
+          link: item.link,
+          guid: typeof item.guid === "string" ? item.guid : undefined,
+          id: (item as Parser.Item & { id?: string }).id,
+        },
+        source.feed_url
+      );
+      if (!url) {
+        skipped_bad_url += 1;
+        continue;
+      }
+
       const summary = stripHtml(
         item.contentSnippet ||
           item.content ||
@@ -125,7 +147,7 @@ export async function fetchSourceFeed(
         skipped += 1;
         continue;
       }
-      articles.push({
+      pending.push({
         source_id: source.id,
         title,
         url,
@@ -138,7 +160,26 @@ export async function fetchSourceFeed(
         is_sample: 0,
       });
     }
-    return { articles, skipped };
+
+    // HTTP-validate only suspicious URLs (WP shortlinks / Deadline tk- slugs)
+    const checked = await mapPool(pending, 4, async (article) => {
+      let needsCheck = false;
+      try {
+        const u = new URL(article.url);
+        if (u.searchParams.has("p") && (u.pathname === "/" || u.pathname === "")) needsCheck = true;
+        if (/\/tk-[a-z0-9-]+/i.test(u.pathname)) needsCheck = true;
+      } catch {
+        return null;
+      }
+      if (!needsCheck) return article;
+      const canonical = await validateAndCanonicalizeUrl(article.url, { timeoutMs: 6000 });
+      if (!canonical) return null;
+      return { ...article, url: canonical };
+    });
+    const articles = checked.filter(Boolean) as Omit<Article, "id">[];
+    skipped_bad_url += pending.length - articles.length;
+
+    return { articles, skipped, skipped_bad_url };
   } catch (e) {
     markSourceUnavailable(source.id, true);
     const msg = e instanceof Error ? e.message : "Unknown fetch error";
@@ -151,9 +192,10 @@ export async function fetchCategoryFeeds(sources: Source[]): Promise<FetchResult
   const results = await Promise.all(enabled.map((s) => fetchSourceFeed(s)));
   const articles = results.flatMap((r) => r.articles);
   const skipped_irrelevant = results.reduce((n, r) => n + (r.skipped || 0), 0);
+  const skipped_bad_url = results.reduce((n, r) => n + (r.skipped_bad_url || 0), 0);
   const errList: { source: string; error: string }[] = [];
   enabled.forEach((s, i) => {
     if (results[i].error) errList.push({ source: s.name, error: results[i].error! });
   });
-  return { articles, errors: errList, skipped_irrelevant };
+  return { articles, errors: errList, skipped_irrelevant, skipped_bad_url };
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ensureStoreReady, getStoryById } from "@/lib/db";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatWhen } from "@/lib/utils";
+import { formatWhen, safeArticleHref } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -75,26 +75,48 @@ export default async function StoryPage({
       <section className="mt-6">
         <h2 className="mb-3 text-lg font-bold text-white">Source breakdown</h2>
         <ul className="space-y-3">
-          {story.articles.map((a) => (
-            <li key={a.id} className="rounded-lg border border-newsroom-border bg-newsroom-panel p-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-newsroom-muted">
-                <span className="font-semibold text-newsroom-electric">{a.source_name || "Source"}</span>
-                <span>rel {a.source_reliability ?? "—"}</span>
-                <span>{a.source_type}</span>
-              </div>
-              <a
-                href={a.url}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 block text-sm font-medium text-white hover:text-newsroom-gold"
-              >
-                {a.title}
-              </a>
-              <p className="mt-1 text-xs text-newsroom-muted">
-                {a.author || "Author not listed"} · {formatWhen(a.published_at)}
-              </p>
-            </li>
-          ))}
+          {story.articles.map((a) => {
+            const href = safeArticleHref(a.url);
+            return (
+              <li key={a.id} className="rounded-lg border border-newsroom-border bg-newsroom-panel p-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-newsroom-muted">
+                  <span className="font-semibold text-newsroom-electric">{a.source_name || "Source"}</span>
+                  <span>rel {a.source_reliability ?? "—"}</span>
+                  <span>{a.source_type}</span>
+                </div>
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 block text-sm font-medium text-white hover:text-newsroom-gold"
+                  >
+                    {a.title}
+                  </a>
+                ) : (
+                  <p className="mt-1 text-sm font-medium text-white">
+                    {a.title}
+                    <span className="ml-2 text-xs font-normal text-newsroom-muted">
+                      (source link unavailable)
+                    </span>
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-newsroom-muted">
+                  {a.author || "Author not listed"} · {formatWhen(a.published_at)}
+                </p>
+                {href && (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block text-xs font-semibold uppercase tracking-wider text-newsroom-gold hover:underline"
+                  >
+                    Read source →
+                  </a>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </section>
     </main>

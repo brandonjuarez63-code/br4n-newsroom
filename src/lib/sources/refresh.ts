@@ -17,7 +17,7 @@ export async function refreshCategory(category: Category) {
   const run = createRefreshRun(category);
   try {
     const sources = listSources(category);
-    const { articles: fetched, errors, skipped_irrelevant } = await fetchCategoryFeeds(sources);
+    const { articles: fetched, errors, skipped_irrelevant, skipped_bad_url } = await fetchCategoryFeeds(sources);
     const db = getDb();
     const saved = fetched.map((a) => upsertArticle(db, a));
     saveDb(db);
@@ -77,6 +77,7 @@ export async function refreshCategory(category: Category) {
       story_count: storyCount,
       errors,
       skipped_irrelevant: skipped_irrelevant || 0,
+      skipped_bad_url: skipped_bad_url || 0,
       kept_samples: saved.length === 0,
     };
   } catch (e) {

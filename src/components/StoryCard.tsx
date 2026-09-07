@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { StoryWithArticles } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
-import { formatWhen } from "@/lib/utils";
+import { formatWhen, safeArticleHref } from "@/lib/utils";
 
 export function StoryCard({
   story,
@@ -14,6 +14,11 @@ export function StoryCard({
   rank?: number;
   compact?: boolean;
 }) {
+  const primary =
+    story.articles.find((a) => a.id === story.primary_article_id) ||
+    story.articles[0];
+  const sourceHref = safeArticleHref(primary?.url);
+
   return (
     <article className="rounded-xl border border-newsroom-border bg-newsroom-card p-4 shadow-sm transition hover:border-newsroom-gold/40">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -54,13 +59,25 @@ export function StoryCard({
         ))}
         <span>Updated {formatWhen(story.updated_at)}</span>
       </div>
-      <div className="mt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-4">
         <Link
           href={`/story/${story.id}`}
           className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold hover:underline"
         >
           Open detail →
         </Link>
+        {sourceHref ? (
+          <a
+            href={sourceHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold uppercase tracking-wider text-newsroom-electric hover:underline"
+          >
+            Read source →
+          </a>
+        ) : primary ? (
+          <span className="text-xs text-newsroom-muted">Source link unavailable</span>
+        ) : null}
       </div>
     </article>
   );
