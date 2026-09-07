@@ -1,5 +1,5 @@
 /**
- * Display-only helpers for Source Breakdown readability.
+ * Display-only helpers for story detail readability.
  * Does not change ranking, confidence, clustering, or URLs.
  */
 import type { StoryWithArticles } from "@/lib/types";
@@ -79,7 +79,7 @@ export function plainWhatWeKnow(story: StoryWithArticles): string {
   if (status === "RUMOR" || status === "UNCONFIRMED") {
     lead += " This remains unconfirmed by an official source.";
   } else if (story.official_confirmed === 1) {
-    lead += " An official source is reflected in the confidence assessment.";
+    lead += " An official source is reflected in the coverage.";
   }
 
   return lead;
@@ -107,19 +107,78 @@ export function plainWhatWeDontKnow(story: StoryWithArticles): string {
   return "Some details may still be pending confirmation.";
 }
 
-/** Readable importance blurb: use why_it_matters first, then a soft restatement of score context. */
+/**
+ * Default-view importance explanation: human-readable why_it_matters only.
+ * No formulas, scoring math, or technical factor strings.
+ */
 export function plainWhyImportance(story: StoryWithArticles): string {
   const matters = trim(story.why_it_matters);
-  const imp = story.importance;
-  const parts: string[] = [];
-  if (matters) parts.push(matters);
-  if (typeof imp === "number") {
-    parts.push(`Newsroom importance score: ${imp}/100.`);
-  }
-  if (!parts.length) return UNAVAILABLE;
-  return parts.join(" ");
+  return matters || UNAVAILABLE;
 }
 
+/**
+ * Default-view confidence explanation in natural language.
+ * Composes from outlet coverage, official confirmation, and status — no math,
+ * no factor lists, no plus/minus scoring language.
+ */
+export function plainWhyConfidence(story: StoryWithArticles): string {
+  const status = trim(story.status) || "UNCONFIRMED";
+  const official = story.official_confirmed === 1;
+  const indie = independentReputableCount(story);
+  const articleCount = Array.isArray(story.articles) ? story.articles.length : 0;
+
+  const outletPhrase =
+    indie == null
+      ? articleCount > 0
+        ? `coverage from ${articleCount} article${articleCount === 1 ? "" : "s"}`
+        : "limited available coverage"
+      : indie === 0
+        ? "limited independent reputable coverage"
+        : indie === 1
+          ? "one independent reputable outlet"
+          : `${indie} independent reputable outlets`;
+
+  const officialPhrase = official
+    ? "an official confirmation is on record"
+    : "no official confirmation is on record";
+
+  if (status === "CONFIRMED") {
+    return `Marked confirmed: ${outletPhrase}, and ${officialPhrase}.`;
+  }
+  if (status === "HIGH CONFIDENCE") {
+    return `High confidence reflects solid corroboration — ${outletPhrase}, and ${officialPhrase}.`;
+  }
+  if (status === "REPORTED") {
+    return `Treated as reported news based on ${outletPhrase}; ${officialPhrase}.`;
+  }
+  if (status === "UNCONFIRMED") {
+    return `Still unconfirmed: ${outletPhrase}, and ${officialPhrase}. Details may shift as reporting develops.`;
+  }
+  if (status === "RUMOR") {
+    return `Currently treated as rumor or speculation, with ${outletPhrase} and ${officialPhrase}.`;
+  }
+
+  return `Status is ${status}, with ${outletPhrase}; ${officialPhrase}.`;
+}
+
+/** Score line for confidence block, e.g. "84/100 — HIGH CONFIDENCE". */
+export function confidenceScoreLine(story: StoryWithArticles): string {
+  const score =
+    typeof story.confidence === "number" ? `${story.confidence}/100` : UNAVAILABLE;
+  const status = trim(story.status);
+  if (!status) return score;
+  if (score === UNAVAILABLE) return status;
+  return `${score} — ${status}`;
+}
+
+/** Score line for importance block, e.g. "85/100". */
+export function importanceScoreLine(story: StoryWithArticles): string {
+  return typeof story.importance === "number"
+    ? `${story.importance}/100`
+    : UNAVAILABLE;
+}
+
+/** Split stored technical why_* semicolon factor strings for collapsed Technical details only. */
 export function scoringDetailLines(why: string | null | undefined): string[] {
   const raw = trim(why);
   if (!raw) return [];

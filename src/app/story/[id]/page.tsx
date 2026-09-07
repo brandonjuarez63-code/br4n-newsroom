@@ -4,11 +4,11 @@ import { getStoryByIdAsync } from "@/lib/db";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatWhen, safeArticleHref } from "@/lib/utils";
 import {
-  highlyReliableSourceCount,
-  highestReliability,
-  independentReputableCount,
+  confidenceScoreLine,
+  importanceScoreLine,
   plainWhatWeDontKnow,
   plainWhatWeKnow,
+  plainWhyConfidence,
   plainWhyImportance,
   scoringDetailLines,
 } from "@/lib/storyPresentation";
@@ -35,17 +35,8 @@ export default async function StoryPage({
   if (!story || story.id !== numericId) notFound();
 
   const articles = Array.isArray(story.articles) ? story.articles : [];
-  const indieCount = independentReputableCount(story);
-  const bestRel = highestReliability(story);
-  const highRelCount = highlyReliableSourceCount(story);
   const importanceDetails = scoringDetailLines(story.why_importance);
   const confidenceDetails = scoringDetailLines(story.why_confidence);
-  const officialYesNo =
-    story.official_confirmed === 1
-      ? "Yes"
-      : story.official_confirmed === 0
-        ? "No"
-        : UNAVAILABLE;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -71,22 +62,13 @@ export default async function StoryPage({
         {story.confidence ?? UNAVAILABLE}/100 · {story.status || UNAVAILABLE}
       </p>
 
-      <section className="mt-6 space-y-5 rounded-xl border border-newsroom-border bg-newsroom-card p-5">
+      <section className="mt-6 space-y-6 rounded-xl border border-newsroom-border bg-newsroom-card p-5">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
             Summary
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
             {textOrUnavailable(story.summary)}
-          </p>
-        </div>
-
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
-            Why it matters
-          </h2>
-          <p className="mt-1 text-sm leading-relaxed">
-            {textOrUnavailable(story.why_it_matters)}
           </p>
         </div>
 
@@ -111,50 +93,31 @@ export default async function StoryPage({
 
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
-            Why importance
+            Why it matters
           </h2>
-          <p className="mt-1 text-sm leading-relaxed text-newsroom-muted">
+          <p className="mt-2 text-2xl font-bold tabular-nums text-white">
+            {importanceScoreLine(story)}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-newsroom-muted">
             {plainWhyImportance(story)}
           </p>
         </div>
 
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-newsroom-gold">
-            Why confidence / status
+            Confidence
           </h2>
-          <ul className="mt-2 space-y-1.5 text-sm text-newsroom-muted">
-            <li>
-              <span className="text-white/80">Independent reputable outlets:</span>{" "}
-              {indieCount == null ? UNAVAILABLE : indieCount}
-            </li>
-            <li>
-              <span className="text-white/80">Highest source reliability:</span>{" "}
-              {bestRel == null ? UNAVAILABLE : `${bestRel}/100`}
-            </li>
-            <li>
-              <span className="text-white/80">Highly reliable sources (≥85):</span>{" "}
-              {highRelCount == null ? UNAVAILABLE : highRelCount}
-            </li>
-            <li>
-              <span className="text-white/80">Official confirmation:</span>{" "}
-              {officialYesNo}
-            </li>
-            <li>
-              <span className="text-white/80">Confidence:</span>{" "}
-              {typeof story.confidence === "number"
-                ? `${story.confidence}/100`
-                : UNAVAILABLE}
-            </li>
-            <li>
-              <span className="text-white/80">Status:</span>{" "}
-              {story.status || UNAVAILABLE}
-            </li>
-          </ul>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-white">
+            {confidenceScoreLine(story)}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-newsroom-muted">
+            {plainWhyConfidence(story)}
+          </p>
         </div>
 
         <details className="rounded-lg border border-newsroom-border bg-newsroom-panel p-3">
           <summary className="cursor-pointer text-sm font-semibold text-newsroom-gold">
-            Show scoring details
+            Technical details
           </summary>
           <div className="mt-3 space-y-3 text-xs text-newsroom-muted">
             <div>
@@ -170,7 +133,7 @@ export default async function StoryPage({
               )}
             </div>
             <div>
-              <p className="font-semibold text-white/70">Confidence factors / penalties</p>
+              <p className="font-semibold text-white/70">Confidence factors</p>
               {confidenceDetails.length ? (
                 <ul className="mt-1 list-inside list-disc">
                   {confidenceDetails.map((line) => (
